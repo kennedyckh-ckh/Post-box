@@ -1,0 +1,43 @@
+# Render Blueprint: New > Blueprint > choose this repository.
+# A persistent disk is REQUIRED (the database and uploaded pictures live on it), and Render offers disks on paid plans only.
+# Run exactly ONE instance (the database is one file).
+services:
+  - type: web
+    name: groupwork
+    runtime: node
+    plan: starter
+    # --include=dev because the build needs TypeScript, which Render would otherwise skip when NODE_ENV=production.
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    disk:
+      name: groupwork-data
+      mountPath: /var/data
+      sizeGB: 2
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATA_DIR
+        value: /var/data
+      - key: COOKIE_SECURE
+        value: "1"
+      - key: TRUST_PROXY
+        value: "1"
+      # Creates the first administrator on first start only. Fill these in on the Render dashboard, sign in, then delete them.
+      - key: BOOTSTRAP_ADMIN_EMAIL
+        sync: false
+      - key: BOOTSTRAP_ADMIN_NAME
+        sync: false
+      - key: BOOTSTRAP_ADMIN_PASSWORD
+        sync: false
+      # AI is optional. To use the HKU service: set AI_PROVIDER to hku and fill in the next three on the dashboard (never here).
+      - key: AI_PROVIDER
+        value: simulated
+      - key: HKU_API_KEY
+        sync: false
+      - key: HKU_API_ENDPOINT
+        sync: false
+      - key: HKU_API_VERSION
+        sync: false
+      - key: AI_MODEL
+        value: gpt-4.1-nano
