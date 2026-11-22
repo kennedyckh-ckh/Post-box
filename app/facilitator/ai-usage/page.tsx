@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api, errText, ApiError } from "@/lib/client/api";
-import { Shell, Card, Button, Alert, Badge, TextField } from "@/components/ui";
+import { Shell, Card, Button, Alert, Badge, TextField, SignOutButton } from "@/components/ui";
 
 interface Sum { requests: number; ok: number; failed: number; promptTokens: number; completionTokens: number; simulated: number }
 interface Report {
@@ -93,7 +93,7 @@ export default function AiUsagePage() {
   if (!u) return <Shell title="AI usage">{err ? <Alert kind="error">{err}</Alert> : <p role="status">Loading…</p>}</Shell>;
   const s = u.status;
   return (
-    <Shell wide title="AI usage">
+    <Shell wide title="AI usage" right={<SignOutButton />}>
       <p className="mb-4"><Link href="/facilitator" className="underline">← Your sessions</Link></p>
       {err && <Alert kind="error">{err}</Alert>}
       <Card className="mb-6">

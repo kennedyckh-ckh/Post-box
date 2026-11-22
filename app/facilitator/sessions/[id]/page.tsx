@@ -2,7 +2,7 @@
 import { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api, errText, ApiError } from "@/lib/client/api";
-import { Shell, Card, Button, Alert, Badge } from "@/components/ui";
+import { Shell, Card, Button, Alert, Badge, SignOutButton } from "@/components/ui";
 import { SetupTab } from "@/components/facilitator/setup-tab";
 import { GroupsTab } from "@/components/facilitator/groups-tab";
 import { PeopleTab } from "@/components/facilitator/people-tab";
@@ -51,7 +51,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   const archived = s.status === "archived";
 
   return (
-    <Shell wide>
+    <Shell wide right={<SignOutButton />}>
       <p className="mb-3"><Link href="/facilitator" className="underline">← Your sessions</Link></p>
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -85,7 +85,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
 
       <div role="tablist" aria-label="Session sections" className="mb-4 flex flex-wrap gap-2">
         {TABS.map((t) => (
-          <button key={t.key} role="tab" id={`tab-${t.key}`} aria-selected={tab === t.key} aria-controls={`panel-${t.key}`} onClick={() => setTab(t.key)} className={`min-h-11 rounded-lg px-4 font-semibold ${tab === t.key ? "bg-brand text-white" : "border border-brand bg-white text-brand-strong"}`}>{t.label}</button>
+          <button key={t.key} role="tab" id={`tab-${t.key}`} aria-selected={tab === t.key} aria-controls={`panel-${t.key}`} onClick={() => setTab(t.key)} className={`min-h-11 rounded-lg px-4 font-semibold transition ${tab === t.key ? "bg-accent text-white shadow-sm" : "border border-brand bg-white text-brand-strong hover:bg-blue-50"}`}>{t.label}</button>
         ))}
       </div>
       <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>

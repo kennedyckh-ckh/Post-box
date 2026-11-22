@@ -2,7 +2,7 @@
 import { use, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { api, errText, ApiError } from "@/lib/client/api";
-import { Shell, Card, Button, Alert, Badge, inputCls } from "@/components/ui";
+import { Shell, Card, Button, Alert, Badge, inputCls, LogoffButton } from "@/components/ui";
 import { EntryEditor } from "@/components/participant/entry-editor";
 import { EntryBody, timeText } from "@/components/participant/entry-view";
 import { SubmitPanel } from "@/components/participant/submit-panel";
@@ -71,7 +71,7 @@ export default function StagePage({ params }: { params: Promise<{ id: string }> 
   const canWrite = list.canWrite;
 
   return (
-    <Shell wide>
+    <Shell wide right={<LogoffButton />}>
       <p className="mb-3"><Link href="/session" className="underline">← My session</Link></p>
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <h1 className="text-3xl font-bold text-brand-strong">{st.title}</h1>

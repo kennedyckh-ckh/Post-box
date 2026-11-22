@@ -1,12 +1,12 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f7f8fc;
-  --foreground: #1b1f33;
-  --brand: #3b3fa8;
-  --brand-strong: #2b2e86;
-  --accent: #6d3fc4;
-  --line: #cfd3e6;
+  --background: #f3f5ff;
+  --foreground: #14183a;
+  --brand: #1d4ed8;
+  --brand-strong: #1e3a8a;
+  --accent: #6d28d9;
+  --line: #c7cfee;
 }
 
 @theme inline {
@@ -19,7 +19,8 @@
 }
 
 body {
-  background: var(--background);
+  background: radial-gradient(1200px 500px at 85% -10%, rgba(109, 40, 217, 0.07), transparent 60%), radial-gradient(900px 500px at -10% 0%, rgba(29, 78, 216, 0.08), transparent 60%), var(--background);
+  background-attachment: fixed;
   color: var(--foreground);
   /* Latin and Traditional Chinese render with system fonts, so no character is ever replaced by a missing-glyph box. */
   font-family: system-ui, -apple-system, "Segoe UI", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "Noto Sans CJK TC", sans-serif;

@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api, errText, ApiError } from "@/lib/client/api";
-import { Shell, Card, Button, TextField, Field, Alert, Badge, inputCls } from "@/components/ui";
+import { Shell, Card, Button, TextField, Field, Alert, Badge, inputCls, SignOutButton } from "@/components/ui";
 
 interface User { id: string; name: string; email: string; isAdmin: boolean; mustChangePassword: boolean }
 interface SessionRow { id: string; title: string; status: string; joinCode: string; participantCount: number; groupCount: number; myRole: string }
@@ -110,13 +110,12 @@ export default function FacilitatorHome() {
   if (user.mustChangePassword) return <ChangePassword onDone={loadUser} />;
 
   return (
-    <Shell wide title="Your sessions">
+    <Shell wide title="Your sessions" right={<SignOutButton />}>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <p>Signed in as <strong>{user.name}</strong> ({user.email})</p>
         <div className="flex gap-2">
           <Link href="/facilitator/ai-usage" className="inline-flex min-h-11 items-center rounded-lg border border-brand px-4 font-semibold text-brand-strong">AI usage</Link>
           {user.isAdmin && <Link href="/facilitator/admin" className="inline-flex min-h-11 items-center rounded-lg border border-brand px-4 font-semibold text-brand-strong">Administration</Link>}
-          <Button variant="secondary" onClick={async () => { await api("POST", "/auth/logout", {}); setUser(null); }}>Sign out</Button>
         </div>
       </div>
       {error && <Alert kind="error">{error}</Alert>}

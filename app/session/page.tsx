@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api, errText, ApiError } from "@/lib/client/api";
-import { Shell, Card, Button, Alert, Badge } from "@/components/ui";
+import { Shell, Card, Button, Alert, Badge, LogoffButton } from "@/components/ui";
 
 interface Me {
   participant: { id: string; displayName: string; extra: { label: string; value: string }[] };
@@ -48,7 +48,7 @@ export default function ParticipantHome() {
   if (!me) return <Shell title="Loading…">{error ? <Alert kind="error">{error}</Alert> : <p role="status">Loading your session…</p>}</Shell>;
 
   return (
-    <Shell title={me.session.title}>
+    <Shell title={me.session.title} right={<LogoffButton />}>
       {error && <Alert kind="error">{error} We will keep trying.</Alert>}
       {me.session.archived && <Alert kind="info">This session has been archived and is read-only.</Alert>}
       <Card className="mb-4">

@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api, errText, ApiError } from "@/lib/client/api";
-import { Shell, Card, Alert, Badge } from "@/components/ui";
+import { Shell, Card, Alert, Badge, LogoffButton } from "@/components/ui";
 import { TableView } from "@/components/participant/entry-view";
 import { ReactionBar, CommentList, CommentBox, type ReactionSummary, type CommentView, type Types } from "@/components/participant/engagement";
 
@@ -23,7 +23,7 @@ export default function BoardPage() {
   useEffect(() => { void load(); const t = setInterval(load, 6000); return () => clearInterval(t); }, [load]);
   if (!b) return <Shell title="Class board">{error ? <Alert kind="error">{error}</Alert> : <p role="status">Loading…</p>}</Shell>;
   return (
-    <Shell wide>
+    <Shell wide right={<LogoffButton />}>
       <p className="mb-3"><Link href="/session" className="underline">← My session</Link></p>
       <h1 className="mb-2 text-3xl font-bold text-brand-strong">Shared with the class</h1>
       <p className="mb-6 text-slate-800">Your facilitator chose these items to share. Names are not shown unless your facilitator chose to show a group name.</p>

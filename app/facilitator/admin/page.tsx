@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api, errText } from "@/lib/client/api";
-import { Shell, Card, Button, TextField, Alert, Badge } from "@/components/ui";
+import { Shell, Card, Button, TextField, Alert, Badge, SignOutButton } from "@/components/ui";
 
 interface U { id: string; email: string; name: string; isAdmin: boolean; mustChangePassword: boolean; disabled: boolean }
 
@@ -16,7 +16,7 @@ export default function AdminPage() {
   useEffect(() => { void load(); }, [load]);
 
   return (
-    <Shell wide title="Administration">
+    <Shell wide title="Administration" right={<SignOutButton />}>
       <p className="mb-4"><Link href="/facilitator" className="underline">← Your sessions</Link></p>
       {error && <Alert kind="error">{error}</Alert>}
       {temp && <Alert kind="warning">Temporary password for {temp.who}: <span className="select-all font-mono font-bold">{temp.pw}</span>. It is shown only once. Give it to them privately; they must choose their own at first sign-in.</Alert>}
