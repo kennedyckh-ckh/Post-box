@@ -418,4 +418,16 @@ CREATE TABLE ai_limits(
 );
 `,
   },
+  {
+    id: "006_question_reveal_and_recovery",
+    sql: `
+-- A guiding question can be kept hidden from participants until the facilitator reveals it. Existing questions stay visible.
+ALTER TABLE stage_questions ADD COLUMN visible INTEGER NOT NULL DEFAULT 1;
+
+-- The participant's recovery code, encrypted (AES-256-GCM) with a key that is kept outside the database, so the
+-- participant can look it up again later from their own signed-in device. recovery_lookup (a hash) is still what
+-- signing in with a code checks. Participants who joined before this change have NULL here.
+ALTER TABLE participants ADD COLUMN recovery_enc TEXT;
+`,
+  },
 ];

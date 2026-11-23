@@ -1,5 +1,5 @@
 import { all, get, run, tx, now, num, str, audit } from "../db";
-import { newId, randomCode, sha256 } from "../crypto";
+import { newId, randomCode, sha256, encryptText, decryptText } from "../crypto";
 import { route, badRequest, conflict, notFound, forbidden, type Ctx } from "../router";
 import { requireStaff, facilitatorSession, participantForFacilitator, requireParticipant, mustBeEditable } from "../authz";
 import { revokeParticipantSessions, startParticipantSession, endSession, PART_COOKIE } from "../auth";
@@ -88,12 +88,13 @@ route("POST", "/join", (ctx) => {
     }
     const fresh = get("SELECT status, joining_open FROM sessions WHERE id=?", String(s.id))!;
     if (fresh.status === "archived" || !num(fresh.joining_open)) throw forbidden("Joining is closed for this session.", "joining_closed");
-    run("INSERT INTO participants(id,session_id,group_id,display_name,extra_json,recovery_lookup,last_seen,created_at) VALUES(?,?,?,?,?,?,?,?)", id, String(s.id), groupId, name, JSON.stringify(extra), lookupOf(recovery), now(), now());
+    run("INSERT INTO participants(id,session_id,group_id,display_name,extra_json,recovery_lookup,recovery_enc,last_seen,created_at) VALUES(?,?,?,?,?,?,?,?,?)", id, String(s.id), groupId, name, JSON.stringify(extra), lookupOf(recovery), encryptText(recovery), now(), now());
     audit("participant", id, "joined", { sessionId: String(s.id), target: groupId ?? undefined });
   });
   startParticipantSession(ctx, id);
-  // The recovery code is returned here once. Only a hash of it is stored.
-  return { participantId: id, recoveryCode: recovery };
+  // The recovery code is NOT shown at joining. The participant looks it up later, from this signed-in device, with
+  // GET /me/recovery-code. A hash (for signing in) and an encrypted copy (for showing it again) are stored.
+  return { participantId: id };
 });
 
 route("POST", "/recover", (ctx) => {
@@ -131,11 +132,24 @@ route("GET", "/me", (ctx) => {
   };
 });
 
+/**
+ * A signed-in participant can look up their own recovery code at any time. Only their own device's session can do
+ * this; the code is never sent to facilitators or anyone else. Participants who joined before codes were stored in a
+ * readable form get `recoveryCode: null` and can make a new one below.
+ */
+route("GET", "/me/recovery-code", (ctx) => {
+  const { participant } = requireParticipant(ctx, { allowArchived: true });
+  hit(`recovery-view:${String(participant.id)}`, 30, 10 * 60_000);
+  const code = decryptText(participant.recovery_enc as string | null);
+  if (code) audit("participant", String(participant.id), "recovery_code_viewed", { sessionId: String(participant.session_id) });
+  return { recoveryCode: code };
+});
+
 /** A signed-in participant can replace their own recovery code (the old one stops working). */
 route("POST", "/me/recovery-code", (ctx) => {
   const { participant } = requireParticipant(ctx);
   const code = newRecoveryCode();
-  run("UPDATE participants SET recovery_lookup=? WHERE id=?", lookupOf(code), String(participant.id));
+  run("UPDATE participants SET recovery_lookup=?, recovery_enc=? WHERE id=?", lookupOf(code), encryptText(code), String(participant.id));
   audit("participant", String(participant.id), "recovery_code_replaced", { sessionId: String(participant.session_id) });
   return { recoveryCode: code };
 });
@@ -221,7 +235,7 @@ route("POST", "/participants/:pid/recovery-code", (ctx) => {
   const revoke = obj(ctx.req.body).revokeDevices !== false;
   const code = newRecoveryCode();
   tx(() => {
-    run("UPDATE participants SET recovery_lookup=? WHERE id=?", lookupOf(code), String(participant.id));
+    run("UPDATE participants SET recovery_lookup=?, recovery_enc=? WHERE id=?", lookupOf(code), encryptText(code), String(participant.id));
     if (revoke) revokeParticipantSessions(String(participant.id));
     audit("facilitator", u.id, "recovery_code_issued", { sessionId: String(session.id), target: String(participant.id), detail: { revokedDevices: revoke } });
   });

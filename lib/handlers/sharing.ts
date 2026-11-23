@@ -6,6 +6,7 @@ import { stageAccess } from "../stages";
 import { obj, text, bool, oneOf } from "../validate";
 import { hit } from "../throttle";
 import { parseJson } from "../content";
+import { expectedGroups, submissionState } from "../submissions";
 import { buildContent, sourceVersionOf, publicView, reactionConfig, critiqueConfig, reactionSummary, commentsFor, upsertPublication, type PubContent } from "../sharing";
 
 /* ===================== facilitator: publish, update, unpublish ===================== */
@@ -256,6 +257,42 @@ route("POST", "/sessions/:id/presentation", (ctx) => {
   const revealed = revealedIds(str(s.id));
   audit("facilitator", u.id, "presentation_changed", { sessionId: str(s.id), detail: { showSummaries: show, revealed: revealed.length } });
   return { ok: true };
+});
+
+/**
+ * The facilitator's own projector view (signed in, no link needed). Everything a room screen may show: the join code,
+ * each part's state and the guiding questions the facilitator has revealed (hidden ones are counted, never sent),
+ * submission progress by group, the items approved for the projector (participant-facing form), and summaries and
+ * discussion questions only when they are switched on / revealed. No names, PINs or recovery data.
+ */
+route("GET", "/sessions/:id/projector", (ctx) => {
+  const s = facilitatorSession(ctx, ctx.params.id);
+  const sid = str(s.id);
+  const st = get("SELECT * FROM presentation_state WHERE session_id=?", sid);
+  const groups = all("SELECT g.id,g.name,(SELECT COUNT(*) FROM participants p WHERE p.group_id=g.id AND p.status='active') AS n FROM groups g WHERE g.session_id=? ORDER BY g.position", sid);
+  const stages = all("SELECT * FROM stages WHERE session_id=? AND enabled=1 ORDER BY position", sid).map((stg) => {
+    const qs = all("SELECT id,text,required,visible FROM stage_questions WHERE stage_id=? AND deleted_at IS NULL ORDER BY position", str(stg.id));
+    const expected = new Set(expectedGroups(sid, str(stg.id)).map((g) => str(g.id)));
+    const perGroup = groups.map((g) => {
+      const state = submissionState(str(g.id), str(stg.id));
+      const entries = num(get("SELECT COUNT(*) AS c FROM entries WHERE group_id=? AND stage_id=? AND deleted_at IS NULL AND hidden_at IS NULL", str(g.id), str(stg.id))!.c);
+      return { groupId: str(g.id), status: state.status, entries, expected: expected.has(str(g.id)) };
+    });
+    return {
+      id: str(stg.id), position: num(stg.position), title: str(stg.title), visible: !!num(stg.visible), availability: str(stg.availability), instructions: str(stg.instructions),
+      questions: qs.filter((q) => num(q.visible)).map((q) => ({ id: str(q.id), text: str(q.text), required: !!num(q.required) })),
+      hiddenQuestions: qs.filter((q) => !num(q.visible)).length,
+      expected: expected.size, submitted: perGroup.filter((x) => x.expected && x.status === "submitted").length, perGroup,
+    };
+  });
+  const rows = all("SELECT * FROM publications WHERE session_id=? AND present=1 AND unpublished_at IS NULL AND source_type<>'ai_output' ORDER BY label_no", sid);
+  const extras = presentationExtras(sid, !!num(st?.show_summaries), parseJson<string[]>(st?.revealed_questions_json, []));
+  return {
+    title: s.title, status: s.status, joinCode: s.join_code, joiningOpen: !!num(s.joining_open),
+    participants: num(get("SELECT COUNT(*) AS c FROM participants WHERE session_id=? AND status='active'", sid)!.c),
+    groups: groups.map((g) => ({ id: str(g.id), name: str(g.name), members: num(g.n) })),
+    stages, items: rows.map(publicView), summaries: extras.summaries, discussionQuestions: extras.questions,
+  };
 });
 
 function presentationSession(token: string): Row {

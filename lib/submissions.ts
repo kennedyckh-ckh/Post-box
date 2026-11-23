@@ -59,7 +59,7 @@ export interface Snapshot {
 /** The group's visible work for a stage, as it is right now. Call inside a write transaction to freeze it consistently. */
 export function buildSnapshot(groupId: string, stageId: string, now: number): Snapshot {
   const stage = get("SELECT * FROM stages WHERE id=?", stageId)!;
-  const questions = all("SELECT id,text,required FROM stage_questions WHERE stage_id=? AND deleted_at IS NULL ORDER BY position", stageId).map((q) => ({ id: str(q.id), text: str(q.text), required: !!num(q.required) }));
+  const questions = all("SELECT id,text,required FROM stage_questions WHERE stage_id=? AND deleted_at IS NULL AND visible=1 ORDER BY position", stageId).map((q) => ({ id: str(q.id), text: str(q.text), required: !!num(q.required) }));
   const qText = new Map(all("SELECT id,text FROM stage_questions WHERE stage_id=?", stageId).map((q) => [str(q.id), str(q.text)]));
   const entries = all("SELECT * FROM entries WHERE group_id=? AND stage_id=? AND deleted_at IS NULL AND hidden_at IS NULL ORDER BY created_at, id", groupId, stageId).map((e): SnapEntry => {
     const att = e.attachment_id ? get("SELECT id,original_name,mime FROM attachments WHERE id=? AND deleted_at IS NULL", str(e.attachment_id)) : undefined;
@@ -73,9 +73,9 @@ export function buildSnapshot(groupId: string, stageId: string, now: number): Sn
   return { stageId, stageTitle: str(stage.title), takenAt: now, questions, entries, synthesis: syn ? { body: str(syn.body), version: num(syn.version) } : null };
 }
 
-/** Required guiding questions that no visible entry of the group answers yet. */
+/** Required guiding questions (revealed to participants) that no visible entry of the group answers yet. Hidden questions never block. */
 export function missingRequired(groupId: string, stageId: string): { questionId: string; text: string }[] {
-  return all("SELECT id,text FROM stage_questions WHERE stage_id=? AND required=1 AND deleted_at IS NULL ORDER BY position", stageId)
+  return all("SELECT id,text FROM stage_questions WHERE stage_id=? AND required=1 AND visible=1 AND deleted_at IS NULL ORDER BY position", stageId)
     .filter((q) => !get("SELECT 1 AS x FROM entries WHERE group_id=? AND stage_id=? AND question_id=? AND deleted_at IS NULL AND hidden_at IS NULL LIMIT 1", groupId, stageId, str(q.id)))
     .map((q) => ({ questionId: str(q.id), text: str(q.text) }));
 }

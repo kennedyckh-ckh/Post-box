@@ -97,5 +97,10 @@ let pcount = 0;
 export async function joinAs(session: { code: string; groups: { id: string }[] }, name: string, opts: { group?: number; pin?: string; extra?: Record<string, string> } = {}) {
   const c = new Client(`10.2.${Math.floor(++pcount / 250)}.${pcount % 250}`);
   const r = await c.post("/join", { joinCode: session.code, displayName: name, groupId: session.groups[opts.group ?? 0].id, pin: opts.pin, extra: opts.extra });
+  // Joining no longer returns the recovery code; the participant looks it up afterwards. Older tests read it from r.body.
+  if (r.status === 200) {
+    if ("recoveryCode" in r.body) throw new Error("join must not return the recovery code");
+    r.body.recoveryCode = (await c.get("/me/recovery-code")).body.recoveryCode;
+  }
   return { c, r };
 }

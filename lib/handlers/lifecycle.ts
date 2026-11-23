@@ -39,7 +39,7 @@ route("POST", "/sessions/:id/duplicate", (ctx) => {
           nid, id, num(st.position), str(st.title), num(st.enabled), num(st.visible), str(st.instructions), str(st.contribution_types_json), str(st.tags_json)
         );
         for (const q of all("SELECT * FROM stage_questions WHERE stage_id=? AND deleted_at IS NULL ORDER BY position", str(st.id))) {
-          run("INSERT INTO stage_questions(id,stage_id,position,text,required) VALUES(?,?,?,?,?)", newId("que"), nid, num(q.position), str(q.text), num(q.required));
+          run("INSERT INTO stage_questions(id,stage_id,position,text,required,visible) VALUES(?,?,?,?,?,?)", newId("que"), nid, num(q.position), str(q.text), num(q.required), q.visible === undefined ? 1 : num(q.visible));
         }
         for (const r of all("SELECT * FROM stage_resources WHERE stage_id=? ORDER BY position", str(st.id))) {
           if (r.kind === "link") {

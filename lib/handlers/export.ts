@@ -51,7 +51,7 @@ function build(s: Row, identified: boolean) {
   const facilitatorContent = {
     stages: stages.map((st) => ({
       id: st.id, position: num(st.position), title: st.title, enabled: !!num(st.enabled), instructions: st.instructions, tags: parseJson<string[]>(st.tags_json, []),
-      questions: all("SELECT id,text,required FROM stage_questions WHERE stage_id=? AND deleted_at IS NULL ORDER BY position", str(st.id)).map((q) => ({ id: q.id, text: q.text, required: !!num(q.required) })),
+      questions: all("SELECT id,text,required,visible FROM stage_questions WHERE stage_id=? AND deleted_at IS NULL ORDER BY position", str(st.id)).map((q) => ({ id: q.id, text: q.text, required: !!num(q.required), visibleToParticipants: !!num(q.visible) })),
       resources: all("SELECT kind,title,url,attachment_id FROM stage_resources WHERE stage_id=? ORDER BY position", str(st.id)).map((r) => ({ kind: r.kind, title: r.title, url: r.url ?? null, attachmentId: r.attachment_id ?? null })),
     })),
     shared: pubs.map((x) => ({
