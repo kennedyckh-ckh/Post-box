@@ -5,10 +5,28 @@ import { obj, text, oneOf } from "./validate";
 import { parseJson } from "./content";
 
 export type Scope = "group" | "published" | "both";
-export interface ReactionConfig { enabled: boolean; scope: Scope; types: { key: string; label: string }[] }
+export const REACTION_ICONS = ["thumbs", "heart", "star", "idea", "clap", "smile", "question", "check", "none"] as const;
+export type ReactionIcon = (typeof REACTION_ICONS)[number];
+export interface ReactionConfig { enabled: boolean; scope: Scope; types: { key: string; label: string; icon: ReactionIcon }[] }
+
+/** A sensible icon for a reaction type that has none yet (older sessions): from its key or label. */
+export function inferIcon(key: string, label: string): ReactionIcon {
+  const s = `${key} ${label}`.toLowerCase();
+  if (/heart|love|愛|心/.test(s)) return "heart";
+  if (/thumb|讚|good/.test(s)) return "thumbs";
+  if (/idea|insight|bulb|新/.test(s)) return "idea";
+  if (/clap|applause|bravo|掌/.test(s)) return "clap";
+  if (/question|wonder|\?|問/.test(s)) return "question";
+  if (/agree|check|yes|同意/.test(s)) return "check";
+  if (/smile|fun|happy|笑/.test(s)) return "smile";
+  return "star";
+}
 export interface CritiqueConfig { enabled: boolean; scope: Scope; requireApproval: boolean; prompts: { key: string; label: string; enabled: boolean }[] }
 
-export const reactionConfig = (s: Row): ReactionConfig => parseJson<ReactionConfig>(s.reaction_config_json, { enabled: false, scope: "both", types: [] });
+export const reactionConfig = (s: Row): ReactionConfig => {
+  const c = parseJson<ReactionConfig>(s.reaction_config_json, { enabled: false, scope: "both", types: [] });
+  return { ...c, types: c.types.map((t) => ({ key: t.key, label: t.label, icon: (REACTION_ICONS as readonly string[]).includes(t.icon) ? t.icon : inferIcon(t.key, t.label) })) };
+};
 export const critiqueConfig = (s: Row): CritiqueConfig => parseJson<CritiqueConfig>(s.critique_config_json, { enabled: false, scope: "both", requireApproval: false, prompts: [] });
 
 const keyOf = (k: unknown) => (typeof k === "string" && /^[a-z0-9_]{1,24}$/.test(k) ? k : `k_${randomCode(5).toLowerCase()}`);
@@ -16,7 +34,13 @@ const keyOf = (k: unknown) => (typeof k === "string" && /^[a-z0-9_]{1,24}$/.test
 export function cleanReactionConfig(v: unknown): ReactionConfig {
   const o = obj(v);
   if (!Array.isArray(o.types) || o.types.length > 6) throw badRequest("Give at most 6 reaction types.");
-  const types = o.types.map((t) => { const x = obj(t); return { key: keyOf(x.key), label: text(x.label, "Reaction label", { max: 20 }) }; });
+  const types = o.types.map((t) => {
+    const x = obj(t);
+    const key = keyOf(x.key);
+    const label = text(x.label, "Reaction label", { max: 20 });
+    const icon = x.icon === undefined || x.icon === null || x.icon === "" ? inferIcon(key, label) : oneOf(x.icon, "Reaction icon", REACTION_ICONS);
+    return { key, label, icon };
+  });
   if (new Set(types.map((t) => t.key)).size !== types.length) throw badRequest("Reaction types must be different.");
   return { enabled: o.enabled === true, scope: oneOf(o.scope, "Reaction scope", ["group", "published", "both"] as const), types };
 }

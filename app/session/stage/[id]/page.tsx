@@ -1,6 +1,7 @@
 "use client";
 import { use, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { ParticipantTimer } from "@/components/timer";
 import { api, errText, ApiError } from "@/lib/client/api";
 import { Shell, Card, Button, Alert, Badge, inputCls, LogoffButton } from "@/components/ui";
 import { EntryEditor } from "@/components/participant/entry-editor";
@@ -78,7 +79,7 @@ export default function StagePage({ params }: { params: Promise<{ id: string }> 
   const canWrite = list.canWrite;
 
   return (
-    <Shell wide right={<LogoffButton />}>
+    <Shell wide right={<LogoffButton />} banner={<ParticipantTimer />}>
       <p className="mb-4 text-sm"><Link href="/session" className="font-semibold text-muted hover:text-brand-strong">← My session</Link></p>
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <h1 className="text-3xl text-ink sm:text-[2.1rem]">{st.title}</h1>
@@ -97,12 +98,27 @@ export default function StagePage({ params }: { params: Promise<{ id: string }> 
               <>
                 <h2 className="mb-2 text-xl text-ink">Guiding questions</h2>
                 <ol className="mb-3 space-y-2" aria-live="polite">
-                  {detail.questions.map((q, i) => (
-                    <li key={q.id} className={`flex gap-3 rounded-lg px-2 py-1.5 ${seenQ.current !== null && !seenQ.current.has(q.id) ? "reveal-in" : ""}`}>
-                      <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-strong text-sm font-semibold text-white">{i + 1}</span>
-                      <span className="pt-0.5 text-ink"><span className="sr-only">Question {i + 1}: </span>{q.text} {q.required && <Badge tone="amber">Required</Badge>}</span>
-                    </li>
-                  ))}
+                  {detail.questions.filter((q) => !q.parentId).map((q, i) => {
+                    const subs = detail.questions.filter((x) => x.parentId === q.id);
+                    return (
+                      <li key={q.id} className={`rounded-lg px-2 py-1.5 ${seenQ.current !== null && !seenQ.current.has(q.id) ? "reveal-in" : ""}`}>
+                        <div className="flex gap-3">
+                          <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-strong text-sm font-semibold text-white">{i + 1}</span>
+                          <span className="pt-0.5 text-ink"><span className="sr-only">Question {i + 1}: </span>{q.text} {q.required && <Badge tone="amber">Required</Badge>}</span>
+                        </div>
+                        {subs.length > 0 && (
+                          <ol className="ml-10 mt-2 space-y-1.5 border-l-2 border-line pl-4">
+                            {subs.map((sq, k) => (
+                              <li key={sq.id} className="flex gap-2 text-ink">
+                                <span className="w-6 shrink-0 font-semibold text-brand" aria-hidden="true">{String.fromCharCode(97 + k)}.</span>
+                                <span><span className="sr-only">Question {i + 1}{String.fromCharCode(97 + k)}: </span>{sq.text} {sq.required && <Badge tone="amber">Required</Badge>}</span>
+                              </li>
+                            ))}
+                          </ol>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ol>
                 {detail.hiddenQuestions > 0 && <p className="mb-3 flex items-center gap-2 text-sm text-muted"><span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-accent" />{detail.questions.length === 0 ? "Your facilitator will reveal the questions for this part soon." : "More questions will appear here when your facilitator reveals them."}</p>}
               </>

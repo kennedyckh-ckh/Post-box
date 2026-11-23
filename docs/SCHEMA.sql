@@ -266,6 +266,16 @@ CREATE TABLE session_facilitators(
   PRIMARY KEY(session_id, user_id)
 );
 
+CREATE TABLE session_timers(
+  session_id TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,
+  label TEXT NOT NULL DEFAULT '',
+  duration_ms INTEGER NOT NULL,
+  ends_at INTEGER,
+  remaining_ms INTEGER,
+  updated_by TEXT,
+  updated_at INTEGER NOT NULL
+);
+
 CREATE TABLE sessions(
   id TEXT PRIMARY KEY,
   title TEXT NOT NULL,
@@ -291,7 +301,7 @@ CREATE TABLE stage_questions(
   position INTEGER NOT NULL,
   text TEXT NOT NULL,
   required INTEGER NOT NULL DEFAULT 0
-, deleted_at INTEGER, visible INTEGER NOT NULL DEFAULT 1);
+, deleted_at INTEGER, visible INTEGER NOT NULL DEFAULT 1, parent_id TEXT);
 
 CREATE TABLE stage_resources(
   id TEXT PRIMARY KEY,
@@ -376,5 +386,7 @@ CREATE INDEX idx_reactions_target ON reactions(target_type, target_id);
 CREATE INDEX idx_res_stage ON stage_resources(stage_id);
 
 CREATE INDEX idx_sf_user ON session_facilitators(user_id);
+
+CREATE INDEX idx_stage_questions_parent ON stage_questions(parent_id);
 
 CREATE UNIQUE INDEX idx_sub_key ON submissions(group_id, stage_id, request_key) WHERE request_key IS NOT NULL;

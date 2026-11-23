@@ -2,6 +2,7 @@
 import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { ParticipantTimer } from "@/components/timer";
 import { api, errText, ApiError } from "@/lib/client/api";
 import { Shell, Card, Button, Alert, Badge, LogoffButton, linkButtonCls } from "@/components/ui";
 
@@ -97,7 +98,7 @@ function ParticipantHomeInner() {
   if (!me) return <Shell title="Loading…">{error ? <Alert kind="error">{error}</Alert> : <p role="status">Loading your session…</p>}</Shell>;
 
   return (
-    <Shell title={me.session.title} right={<LogoffButton />}>
+    <Shell title={me.session.title} right={<LogoffButton />} banner={<ParticipantTimer />}>
       {welcome && <Alert kind="success">You have joined. Your private recovery code is at the bottom of this page whenever you need it.</Alert>}
       {error && <Alert kind="error">{error} We will keep trying.</Alert>}
       {me.session.archived && <Alert kind="info">This session has been archived and is read-only.</Alert>}

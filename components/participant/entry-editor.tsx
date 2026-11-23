@@ -105,7 +105,7 @@ export function EntryEditor({ detail, editing, onDone, onState }: Props) {
       )}
       {detail.questions.length > 0 && (
         <Field label="Which question is this for? (optional)">
-          {(id) => <select id={id} className={inputCls} value={questionId} onChange={(e) => { setQuestionId(e.target.value); touch(); }}><option value="">General</option>{detail.questions.map((q) => <option key={q.id} value={q.id}>{q.text}</option>)}</select>}
+          {(id) => <select id={id} className={inputCls} value={questionId} onChange={(e) => { setQuestionId(e.target.value); touch(); }}><option value="">General</option>{questionOptions(detail.questions).map((q) => <option key={q.id} value={q.id}>{q.label}. {q.text}</option>)}</select>}
         </Field>
       )}
       <Field label={kind === "text" ? "Your contribution" : "Caption (optional)"} hint="Your name is shown with your entry. Only your group can see it until your facilitator shares it.">
@@ -137,4 +137,16 @@ export function EntryEditor({ detail, editing, onDone, onState }: Props) {
       </div>
     </form>
   );
+}
+
+/** "1", "1a", "1b", "2" … in the order participants see them. */
+function questionOptions(qs: { id: string; text: string; parentId: string | null }[]) {
+  const out: { id: string; text: string; label: string }[] = [];
+  let n = 0;
+  for (const q of qs.filter((x) => !x.parentId)) {
+    n++;
+    out.push({ id: q.id, text: q.text, label: String(n) });
+    qs.filter((x) => x.parentId === q.id).forEach((sq, k) => out.push({ id: sq.id, text: sq.text, label: `${n}${String.fromCharCode(97 + k)}` }));
+  }
+  return out;
 }

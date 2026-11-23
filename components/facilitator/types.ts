@@ -4,7 +4,7 @@ export interface Detail {
     id: string; title: string; joinCode: string; joiningOpen: boolean; earlyJoin: boolean; status: "setup" | "live" | "archived";
     groupJoinMode: "choose" | "assigned"; submitPolicy: "any" | "representative"; participantFields: FieldDef[]; anonymiseDefault: boolean; myRole: "owner" | "co";
     aiCriteria: { preset: string; purpose: string; criteria: string; language: string; detail: "brief" | "standard" | "detailed" };
-    reactionConfig: { enabled: boolean; scope: string; types: { key: string; label: string }[] };
+    reactionConfig: { enabled: boolean; scope: string; types: { key: string; label: string; icon?: string }[] };
     critiqueConfig: { enabled: boolean; scope: string; requireApproval: boolean; prompts: { key: string; label: string; enabled: boolean }[] };
   };
   groups: { id: string; name: string; seatCap: number | null; hasPin: boolean; activeCount: number; representativeId: string | null }[];

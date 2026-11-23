@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { ParticipantTimer } from "@/components/timer";
 import { api, errText, ApiError } from "@/lib/client/api";
 import { Shell, Card, Alert, Badge, LogoffButton } from "@/components/ui";
 import { TableView } from "@/components/participant/entry-view";
@@ -23,7 +24,7 @@ export default function BoardPage() {
   useEffect(() => { void load(); const t = setInterval(load, 6000); return () => clearInterval(t); }, [load]);
   if (!b) return <Shell title="Class board">{error ? <Alert kind="error">{error}</Alert> : <p role="status">Loading…</p>}</Shell>;
   return (
-    <Shell wide right={<LogoffButton />}>
+    <Shell wide right={<LogoffButton />} banner={<ParticipantTimer />}>
       <p className="mb-4 text-sm"><Link href="/session" className="font-semibold text-muted hover:text-brand-strong">← My session</Link></p>
       <h1 className="mb-2 text-3xl text-ink sm:text-[2.1rem]">Shared with the class</h1>
       <p className="mb-6 text-slate-800">Your facilitator chose these items to share. Names are not shown unless your facilitator chose to show a group name.</p>

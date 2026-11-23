@@ -2,10 +2,11 @@
 import { useState } from "react";
 import { api, errText } from "@/lib/client/api";
 import { Button, Alert, inputCls } from "@/components/ui";
+import { ReactionIcon } from "@/components/reaction-icon";
 
 export interface ReactionSummary { counts: Record<string, number>; mine: string[]; total: number }
 export interface CommentView { id: string; author: string; mine: boolean; promptKey: string; body: string; status: string; createdAt: number }
-export interface Types { key: string; label: string }
+export interface Types { key: string; label: string; icon?: string }
 
 /** One reaction of each type per person. Counts are a sign of engagement, not of whether an answer is right. */
 export function ReactionBar({ targetType, targetId, types, summary, onChange }: { targetType: "entry" | "publication"; targetId: string; types: Types[]; summary?: ReactionSummary; onChange: () => void }) {
@@ -17,9 +18,11 @@ export function ReactionBar({ targetType, targetId, types, summary, onChange }: 
         {types.map((t) => {
           const on = s.mine.includes(t.key);
           return (
-            <button key={t.key} type="button" aria-pressed={on} className={`min-h-11 rounded-full border px-3 text-sm font-semibold ${on ? "border-brand bg-brand text-white" : "border-brand bg-white text-brand-strong"}`}
+            <button key={t.key} type="button" aria-pressed={on} title={t.label} className={`inline-flex min-h-11 items-center gap-1.5 rounded-full border px-3.5 text-sm font-semibold transition ${on ? (t.icon === "heart" ? "border-rose-600 bg-rose-600 text-white" : "border-brand-strong bg-brand-strong text-white") : `border-line-strong bg-surface hover:border-brand ${t.icon === "heart" ? "text-rose-700" : "text-brand-strong"}`}`}
               onClick={async () => { setErr(""); try { await api("POST", "/reactions", { targetType, targetId, type: t.key, on: !on }); onChange(); } catch (e) { setErr(errText(e)); } }}>
-              {on ? "✓ " : ""}{t.label} <span aria-label={`${s.counts[t.key] ?? 0} people`}>({s.counts[t.key] ?? 0})</span>
+              <ReactionIcon icon={t.icon} filled={on} />
+              <span>{t.label}</span>
+              <span className={`min-w-5 rounded-full px-1.5 text-xs tabular-nums ${on ? "bg-white/20" : "bg-[#eeebe4] text-foreground"}`} aria-label={`${s.counts[t.key] ?? 0} people`}>{s.counts[t.key] ?? 0}</span>
             </button>
           );
         })}

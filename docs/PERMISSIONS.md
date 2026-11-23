@@ -59,7 +59,9 @@ A facilitator reaches a session only if they own it or were explicitly added. An
 | Approve an item for the projector; create or revoke the projector link | – | – | – | Yes | Yes | – |
 | See the shared items (class board) | – | Yes | Yes | Yes | Yes | – |
 | See the projector page | Only with the secret link | n/a | n/a | n/a | n/a | n/a |
-| Open the signed-in projector view; reveal or hide guiding questions | – | – | – | Yes | Yes | – |
+| Open the signed-in projector view; reveal or hide guiding questions; add sub-questions | – | – | – | Yes | Yes | – |
+| Start, pause, resume, extend or reset the session timer | – | – | – | Yes | Yes | – |
+| See the session timer | Projector link only | Yes (own session) | – | Yes | Yes | – |
 | React to an entry in the group | – | Yes, if reactions are on for groups | – | – | – | – |
 | React to a shared item | – | Yes, if on for shared items | Yes | – | – | – |
 | Respond to a peer's entry / a shared item | – | Yes (not to their own entry) | Shared items only | – | – | – |

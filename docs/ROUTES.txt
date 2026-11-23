@@ -38,6 +38,7 @@ POST   /api/leave
 GET    /api/me
 GET    /api/me/recovery-code
 POST   /api/me/recovery-code
+GET    /api/me/timer
 POST   /api/participants/:pid/move
 POST   /api/participants/:pid/recovery-code
 POST   /api/participants/:pid/remove
@@ -86,6 +87,8 @@ POST   /api/sessions/:id/restore
 GET    /api/sessions/:id/stages
 POST   /api/sessions/:id/start
 GET    /api/sessions/:id/submissions
+GET    /api/sessions/:id/timer
+POST   /api/sessions/:id/timer
 GET    /api/stages/:sid
 PATCH  /api/stages/:sid
 GET    /api/stages/:sid/entries

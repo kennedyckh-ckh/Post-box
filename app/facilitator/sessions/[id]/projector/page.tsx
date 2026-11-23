@@ -4,10 +4,11 @@ import qrcode from "qrcode-generator";
 import { api, errText, ApiError } from "@/lib/client/api";
 import { Logo } from "@/components/ui";
 import { ProjectorItemView, type ProjectorItem } from "@/components/projector/shared-item";
+import { useRemaining, fmt, type TimerView } from "@/components/timer";
 
 interface PStage {
   id: string; position: number; title: string; visible: boolean; availability: "locked" | "open" | "closed"; instructions: string;
-  questions: { id: string; text: string; required: boolean }[]; hiddenQuestions: number;
+  questions: { id: string; text: string; required: boolean; parentId: string | null }[]; hiddenQuestions: number;
   expected: number; submitted: number; perGroup: { groupId: string; status: "draft" | "submitted" | "reopened"; entries: number; expected: boolean }[];
 }
 interface Feed {
@@ -15,15 +16,17 @@ interface Feed {
   groups: { id: string; name: string; members: number }[];
   stages: PStage[]; items: ProjectorItem[];
   summaries: { id: string; label: string; text: string }[]; discussionQuestions: { id: string; text: string }[];
+  timer: TimerView;
 }
 
-type Mode = "join" | "questions" | "progress" | "shared" | "discussion";
+type Mode = "join" | "questions" | "progress" | "shared" | "discussion" | "timer";
 const MODES: { key: Mode; label: string }[] = [
   { key: "join", label: "Join" },
   { key: "questions", label: "Questions" },
   { key: "progress", label: "Progress" },
   { key: "shared", label: "Shared work" },
   { key: "discussion", label: "Discussion" },
+  { key: "timer", label: "Timer" },
 ];
 
 function QR({ text, size }: { text: string; size: number }) {
@@ -78,6 +81,13 @@ export default function ProjectorPage({ params }: { params: Promise<{ id: string
   const items = d?.items ?? [];
   const item = items.length ? items[Math.min(itemIdx, items.length - 1)] : null;
   const hasDiscussion = !!d && (d.summaries.length > 0 || d.discussionQuestions.length > 0);
+  const timer = d?.timer ?? null;
+  const left = useRemaining(timer);
+  const timerOn = !!timer && timer.state !== "idle";
+  const timerDone = !!timer && (timer.state === "finished" || (timer.state === "running" && left === 0));
+  const timerAct = useCallback(async (body: Record<string, unknown>) => {
+    try { await api("POST", `/sessions/${id}/timer`, body); await load(); } catch (e) { setFlash(errText(e)); setTimeout(() => setFlash(""), 2600); }
+  }, [id, load]);
 
   // Highlight questions that are revealed while the projector is showing them.
   useEffect(() => {
@@ -152,12 +162,20 @@ export default function ProjectorPage({ params }: { params: Promise<{ id: string
           <Logo size={40} tone="light" />
           <p className="truncate font-display text-[clamp(1.1rem,1.8vw,1.8rem)] font-semibold text-white/90">{d?.title ?? "Loading…"}</p>
         </div>
+        <div className="flex shrink-0 items-center gap-3">
+        {timerOn && mode !== "timer" && (
+          <div role="timer" aria-label={timerDone ? "Time is up" : `${fmt(left)} left`} className={`flex items-center gap-3 rounded-2xl px-5 py-2.5 ring-1 ${timerDone ? "bg-[#e8b384] text-[#0c1a20] ring-[#e8b384]" : left <= 60_000 ? "bg-[#e8b384]/15 ring-[#e8b384]/60" : "bg-white/10 ring-white/15"}`}>
+            <span className="text-[clamp(0.75rem,0.9vw,0.95rem)] uppercase tracking-[0.18em] opacity-70">{timer!.label || "Time left"}{timer!.state === "paused" ? " · paused" : ""}</span>
+            <span className="text-[clamp(1.3rem,2vw,2rem)] font-bold tabular-nums tracking-tight">{timerDone ? "Time's up" : fmt(left)}</span>
+          </div>
+        )}
         {d && mode !== "join" && (
           <div className="flex shrink-0 items-center gap-4 rounded-2xl bg-white/10 px-5 py-2.5 ring-1 ring-white/15">
             <span className="text-[clamp(0.75rem,0.9vw,0.95rem)] uppercase tracking-[0.18em] text-white/60">Join at {origin.replace(/^https?:\/\//, "")}/join</span>
             <span className="font-mono text-[clamp(1.3rem,2vw,2rem)] font-bold tracking-[0.2em]">{d.joinCode}</span>
           </div>
         )}
+        </div>
       </header>
 
       {err && <p role="status" className="mx-[4vw] mt-4 rounded-xl bg-amber-200 px-5 py-3 text-lg font-semibold text-[#0c1a20]">{err}</p>}
@@ -191,12 +209,27 @@ export default function ProjectorPage({ params }: { params: Promise<{ id: string
                     <Empty title={stage.hiddenQuestions ? "Questions are ready to reveal" : "No guiding questions in this part"} text={stage.hiddenQuestions ? `${stage.hiddenQuestions} ${stage.hiddenQuestions === 1 ? "question is" : "questions are"} waiting. Press “Reveal next question” or R.` : "Add questions in the Parts tab of the session page."} />
                   ) : (
                     <ol className="mt-[4vh] space-y-[2.6vh]">
-                      {stage.questions.map((q, i) => (
-                        <li key={q.id} className={`flex gap-[1.6vw] rounded-2xl px-3 py-2 ${seen.current !== null && !seen.current.has(q.id) ? "fade-up" : ""}`}>
-                          <span aria-hidden="true" className="mt-1 flex h-[clamp(2.4rem,3.6vw,3.6rem)] w-[clamp(2.4rem,3.6vw,3.6rem)] shrink-0 items-center justify-center rounded-full bg-[#9fd0cb] font-display text-[clamp(1.2rem,2vw,2rem)] font-semibold text-[#0c1a20]">{i + 1}</span>
-                          <p className="text-[clamp(1.6rem,3vw,3.2rem)] leading-tight text-white">{q.text}</p>
-                        </li>
-                      ))}
+                      {stage.questions.filter((q) => !q.parentId).map((q, i) => {
+                        const subs = stage.questions.filter((x) => x.parentId === q.id);
+                        return (
+                          <li key={q.id} className={`rounded-2xl px-3 py-2 ${seen.current !== null && !seen.current.has(q.id) ? "fade-up" : ""}`}>
+                            <div className="flex gap-[1.6vw]">
+                              <span aria-hidden="true" className="mt-1 flex h-[clamp(2.4rem,3.6vw,3.6rem)] w-[clamp(2.4rem,3.6vw,3.6rem)] shrink-0 items-center justify-center rounded-full bg-[#9fd0cb] font-display text-[clamp(1.2rem,2vw,2rem)] font-semibold text-[#0c1a20]">{i + 1}</span>
+                              <p className="text-[clamp(1.6rem,3vw,3.2rem)] leading-tight text-white">{q.text}</p>
+                            </div>
+                            {subs.length > 0 && (
+                              <ol className="ml-[clamp(3.2rem,5.2vw,5.2rem)] mt-[1.4vh] space-y-[1vh] border-l-2 border-white/15 pl-[1.4vw]">
+                                {subs.map((sq, k) => (
+                                  <li key={sq.id} className="flex gap-[1vw] text-[clamp(1.2rem,2.1vw,2.2rem)] leading-snug text-white/85">
+                                    <span className="font-display font-semibold text-[#9fd0cb]">{String.fromCharCode(97 + k)}.</span>
+                                    <span>{sq.text}</span>
+                                  </li>
+                                ))}
+                              </ol>
+                            )}
+                          </li>
+                        );
+                      })}
                       {stage.hiddenQuestions > 0 && (
                         <li className="flex items-center gap-[1.6vw] px-3 py-2 text-white/45">
                           <span aria-hidden="true" className="flex h-[clamp(2.4rem,3.6vw,3.6rem)] w-[clamp(2.4rem,3.6vw,3.6rem)] shrink-0 items-center justify-center rounded-full border-2 border-dashed border-white/30 font-display text-[clamp(1.2rem,2vw,2rem)]">+{stage.hiddenQuestions}</span>
@@ -243,6 +276,16 @@ export default function ProjectorPage({ params }: { params: Promise<{ id: string
                   <ProjectorItemView key={item.id} it={item} imageSrc={(a) => `/api/attachments/${encodeURIComponent(a)}`} />
                 </div>
               )
+            )}
+
+            {mode === "timer" && (
+              <div className="m-auto flex flex-col items-center text-center">
+                <p className="text-[clamp(1rem,1.5vw,1.6rem)] font-semibold uppercase tracking-[0.22em] text-[#9fd0cb]">{timerOn ? (timer!.label || "Time left") : "Timer"}{timer?.state === "paused" ? " · paused" : ""}</p>
+                <p role="timer" aria-label={!timerOn ? "Timer not started" : timerDone ? "Time is up" : `${fmt(left)} left`} className={`mt-[2vh] font-semibold leading-none tabular-nums tracking-tight ${timerDone ? "text-[#e8b384]" : left <= 60_000 && timerOn ? "text-[#f3d2b3]" : "text-white"} text-[clamp(6rem,19vw,22rem)]`}>{!timerOn ? "–:––" : timerDone ? "0:00" : fmt(left)}</p>
+                {timerDone && <p className="mt-[2vh] font-display text-[clamp(2rem,4vw,4rem)] font-semibold text-[#e8b384]">Time's up</p>}
+                {timerOn && !timerDone && timer!.durationMs > 0 && <div className="mt-[4vh] h-3 w-[min(70vw,1100px)] overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-[#9fd0cb]" style={{ width: `${Math.min(100, (left / timer!.durationMs) * 100)}%`, transition: "width 0.25s linear" }} /></div>}
+                {!timerOn && <p className="mt-[3vh] text-[clamp(1.1rem,1.5vw,1.5rem)] text-white/60">Choose a length below to start the countdown. Participants see it too.</p>}
+              </div>
             )}
 
             {mode === "discussion" && (
@@ -296,6 +339,15 @@ export default function ProjectorPage({ params }: { params: Promise<{ id: string
             <div className="flex items-center gap-1 border-l border-white/10 pl-2">
               <DockBtn label="Previous item" onClick={() => setItemIdx((i) => Math.max(0, i - 1))} disabled={itemIdx === 0}>←</DockBtn>
               <DockBtn label="Next item" onClick={() => setItemIdx((i) => Math.min(items.length - 1, i + 1))} disabled={itemIdx >= items.length - 1}>→</DockBtn>
+            </div>
+          )}
+          {mode === "timer" && (
+            <div className="flex flex-wrap items-center gap-1 border-l border-white/10 pl-2">
+              {[1, 3, 5, 10, 15].map((m) => <DockBtn key={m} label={`Start a ${m} minute timer`} onClick={() => void timerAct({ action: "start", seconds: m * 60, label: timer?.label ?? "" })}>{m}m</DockBtn>)}
+              {timer?.state === "running" && !timerDone && <DockBtn label="Pause timer" onClick={() => void timerAct({ action: "pause" })}>Pause</DockBtn>}
+              {timer?.state === "paused" && <button type="button" onClick={() => void timerAct({ action: "resume" })} className="min-h-10 rounded-xl bg-[#e8b384] px-4 text-sm font-semibold text-[#0c1a20] hover:bg-[#f3d2b3]">Resume</button>}
+              {timerOn && <DockBtn label="Add one minute" onClick={() => void timerAct({ action: "add", seconds: 60 })}>+1m</DockBtn>}
+              {timerOn && <DockBtn label="Reset timer" onClick={() => void timerAct({ action: "reset" })}>Reset</DockBtn>}
             </div>
           )}
           <div className="border-l border-white/10 pl-2"><DockBtn label="Full screen (F)" onClick={toggleFullscreen}>Full screen</DockBtn></div>

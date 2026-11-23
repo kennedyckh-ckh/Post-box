@@ -4,6 +4,7 @@ import { route, badRequest, conflict, notFound, forbidden, HttpError, type Ctx }
 import { requireStaff, facilitatorSession, groupForFacilitator, mustBeEditable } from "../authz";
 import { obj, text, bool, oneOf, int } from "../validate";
 import { parseJson } from "../content";
+import { allQuestions } from "../questions";
 import { validateAndStore, removeStored, FILE_LIMITS } from "../files";
 import { expectedGroups, submissionState } from "../submissions";
 import { reactionConfig, reactionSummary } from "../sharing";
@@ -16,7 +17,7 @@ function stageForFacilitator(ctx: Ctx, stageId: string): { stage: Row; session: 
 }
 
 function questionsOf(stageId: string) {
-  return all("SELECT id,position,text,required,visible FROM stage_questions WHERE stage_id=? AND deleted_at IS NULL ORDER BY position", stageId).map((q) => ({ id: q.id, position: num(q.position), text: q.text, required: !!num(q.required), visible: !!num(q.visible) }));
+  return allQuestions(stageId);
 }
 function resourcesOf(stageId: string) {
   return all("SELECT r.id,r.kind,r.title,r.url,r.attachment_id,a.mime,a.bytes FROM stage_resources r LEFT JOIN attachments a ON a.id=r.attachment_id WHERE r.stage_id=? ORDER BY r.position", stageId).map((r) => ({
@@ -124,9 +125,18 @@ route("POST", "/stages/:sid/questions", (ctx) => {
   const t = text(b.text, "Question", { max: 500 });
   const id = newId("que");
   const pos = num(get("SELECT COALESCE(MAX(position),0)+1 AS p FROM stage_questions WHERE stage_id=?", str(stage.id))!.p);
-  // visible defaults to true; send visible:false to keep the question hidden until you reveal it.
-  const visible = b.visible === undefined ? true : bool(b.visible, "visible");
-  run("INSERT INTO stage_questions(id,stage_id,position,text,required,visible) VALUES(?,?,?,?,?,?)", id, str(stage.id), pos, t, b.required === true ? 1 : 0, visible ? 1 : 0);
+  // Optional parentId makes this a sub-question of a main question in the same part (one level only).
+  let parentId: string | null = null;
+  if (b.parentId !== undefined && b.parentId !== null && b.parentId !== "") {
+    const parent = get("SELECT id, parent_id FROM stage_questions WHERE id=? AND stage_id=? AND deleted_at IS NULL", str(b.parentId), str(stage.id));
+    if (!parent) throw badRequest("The main question was not found in this part.");
+    if (parent.parent_id) throw badRequest("Sub-questions cannot have their own sub-questions.");
+    if (num(get("SELECT COUNT(*) AS c FROM stage_questions WHERE parent_id=? AND deleted_at IS NULL", str(parent.id))!.c) >= 10) throw badRequest("A question can have at most 10 sub-questions.");
+    parentId = str(parent.id);
+  }
+  // visible defaults to true; send visible:false to keep the question hidden until you reveal it. Sub-questions follow their main question.
+  const visible = parentId ? true : b.visible === undefined ? true : bool(b.visible, "visible");
+  run("INSERT INTO stage_questions(id,stage_id,position,text,required,visible,parent_id) VALUES(?,?,?,?,?,?,?)", id, str(stage.id), pos, t, b.required === true ? 1 : 0, visible ? 1 : 0, parentId);
   audit("facilitator", u.id, "question_added", { sessionId: str(session.id), target: id });
   return { id };
 });
@@ -148,7 +158,10 @@ route("PATCH", "/questions/:qid", (ctx) => {
   if (b.text !== undefined) { sets.push("text=?"); vals.push(text(b.text, "Question", { max: 500 })); }
   if (b.required !== undefined) { sets.push("required=?"); vals.push(bool(b.required, "required") ? 1 : 0); }
   let visibility: boolean | undefined;
-  if (b.visible !== undefined) { visibility = bool(b.visible, "visible"); sets.push("visible=?"); vals.push(visibility ? 1 : 0); }
+  if (b.visible !== undefined) {
+    if (q.parent_id) throw badRequest("A sub-question is shown together with its main question. Reveal or hide the main question instead.");
+    visibility = bool(b.visible, "visible"); sets.push("visible=?"); vals.push(visibility ? 1 : 0);
+  }
   if (!sets.length) throw badRequest("Nothing to change.");
   vals.push(str(q.id));
   run(`UPDATE stage_questions SET ${sets.join(",")} WHERE id=?`, ...vals);
@@ -168,14 +181,15 @@ route("POST", "/stages/:sid/questions/reveal", (ctx) => {
   const sid = str(stage.id);
   let changed = 0;
   if (mode === "next") {
-    const q = get("SELECT id FROM stage_questions WHERE stage_id=? AND deleted_at IS NULL AND visible=0 ORDER BY position LIMIT 1", sid);
+    const q = get("SELECT id FROM stage_questions WHERE stage_id=? AND deleted_at IS NULL AND parent_id IS NULL AND visible=0 ORDER BY position LIMIT 1", sid);
     if (q) { run("UPDATE stage_questions SET visible=1 WHERE id=?", str(q.id)); changed = 1; }
   } else {
-    changed = run("UPDATE stage_questions SET visible=? WHERE stage_id=? AND deleted_at IS NULL AND visible<>?", mode === "all" ? 1 : 0, sid, mode === "all" ? 1 : 0).changes;
+    changed = run("UPDATE stage_questions SET visible=? WHERE stage_id=? AND deleted_at IS NULL AND parent_id IS NULL AND visible<>?", mode === "all" ? 1 : 0, sid, mode === "all" ? 1 : 0).changes;
   }
   audit("facilitator", u.id, mode === "none" ? "questions_hidden" : "questions_revealed", { sessionId: str(session.id), target: sid, detail: { mode, changed } });
   const qs = questionsOf(sid);
-  return { changed, visibleCount: qs.filter((q) => q.visible).length, total: qs.length };
+  const top = qs.filter((q) => !q.parentId);
+  return { changed, visibleCount: top.filter((q) => q.visible).length, total: top.length };
 });
 
 /** Questions are retired, not erased: earlier entries keep pointing at them. */
@@ -183,7 +197,8 @@ route("DELETE", "/questions/:qid", (ctx) => {
   const u = requireStaff(ctx);
   const { q, session } = questionForFacilitator(ctx, ctx.params.qid);
   mustBeEditable(session);
-  run("UPDATE stage_questions SET deleted_at=? WHERE id=?", now(), str(q.id));
+  // Removing a main question also retires its sub-questions.
+  run("UPDATE stage_questions SET deleted_at=? WHERE (id=? OR parent_id=?) AND deleted_at IS NULL", now(), str(q.id), str(q.id));
   audit("facilitator", u.id, "question_removed", { sessionId: str(session.id), target: str(q.id) });
   return { ok: true };
 });

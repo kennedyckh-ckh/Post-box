@@ -7,6 +7,8 @@ import { obj, text, bool, oneOf } from "../validate";
 import { hit } from "../throttle";
 import { parseJson } from "../content";
 import { expectedGroups, submissionState } from "../submissions";
+import { allQuestions } from "../questions";
+import { timerView } from "../timer";
 import { buildContent, sourceVersionOf, publicView, reactionConfig, critiqueConfig, reactionSummary, commentsFor, upsertPublication, type PubContent } from "../sharing";
 
 /* ===================== facilitator: publish, update, unpublish ===================== */
@@ -271,7 +273,7 @@ route("GET", "/sessions/:id/projector", (ctx) => {
   const st = get("SELECT * FROM presentation_state WHERE session_id=?", sid);
   const groups = all("SELECT g.id,g.name,(SELECT COUNT(*) FROM participants p WHERE p.group_id=g.id AND p.status='active') AS n FROM groups g WHERE g.session_id=? ORDER BY g.position", sid);
   const stages = all("SELECT * FROM stages WHERE session_id=? AND enabled=1 ORDER BY position", sid).map((stg) => {
-    const qs = all("SELECT id,text,required,visible FROM stage_questions WHERE stage_id=? AND deleted_at IS NULL ORDER BY position", str(stg.id));
+    const qs = allQuestions(str(stg.id));
     const expected = new Set(expectedGroups(sid, str(stg.id)).map((g) => str(g.id)));
     const perGroup = groups.map((g) => {
       const state = submissionState(str(g.id), str(stg.id));
@@ -280,8 +282,8 @@ route("GET", "/sessions/:id/projector", (ctx) => {
     });
     return {
       id: str(stg.id), position: num(stg.position), title: str(stg.title), visible: !!num(stg.visible), availability: str(stg.availability), instructions: str(stg.instructions),
-      questions: qs.filter((q) => num(q.visible)).map((q) => ({ id: str(q.id), text: str(q.text), required: !!num(q.required) })),
-      hiddenQuestions: qs.filter((q) => !num(q.visible)).length,
+      questions: qs.filter((q) => q.visible).map((q) => ({ id: q.id, text: q.text, required: q.required, parentId: q.parentId })),
+      hiddenQuestions: qs.filter((q) => !q.visible && !q.parentId).length,
       expected: expected.size, submitted: perGroup.filter((x) => x.expected && x.status === "submitted").length, perGroup,
     };
   });
@@ -292,6 +294,7 @@ route("GET", "/sessions/:id/projector", (ctx) => {
     participants: num(get("SELECT COUNT(*) AS c FROM participants WHERE session_id=? AND status='active'", sid)!.c),
     groups: groups.map((g) => ({ id: str(g.id), name: str(g.name), members: num(g.n) })),
     stages, items: rows.map(publicView), summaries: extras.summaries, discussionQuestions: extras.questions,
+    timer: timerView(sid),
   };
 });
 
@@ -313,7 +316,7 @@ route("GET", "/present/:token", (ctx) => {
   const st = s._state as Row;
   const rows = all("SELECT * FROM publications WHERE session_id=? AND present=1 AND unpublished_at IS NULL AND source_type<>'ai_output' ORDER BY label_no", str(s.id));
   const extras = presentationExtras(str(s.id), !!num(st.show_summaries), parseJson<string[]>(st.revealed_questions_json, []));
-  return { title: s.title, items: rows.map(publicView), summaries: extras.summaries, questions: extras.questions };
+  return { title: s.title, items: rows.map(publicView), summaries: extras.summaries, questions: extras.questions, timer: timerView(str(s.id)) };
 });
 
 route("GET", "/present/:token/attachments/:id", (ctx) => {
