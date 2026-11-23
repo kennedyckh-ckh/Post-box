@@ -12,6 +12,7 @@ import "./audit";
 import "./sharing";
 import "./export";
 import "./ai";
+import "./timer";
 import { route } from "../router";
 import { get } from "../db";
 

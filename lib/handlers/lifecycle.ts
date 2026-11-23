@@ -38,8 +38,14 @@ route("POST", "/sessions/:id/duplicate", (ctx) => {
           "INSERT INTO stages(id,session_id,position,title,enabled,visible,availability,instructions,contribution_types_json,tags_json) VALUES(?,?,?,?,?,?,'locked',?,?,?)",
           nid, id, num(st.position), str(st.title), num(st.enabled), num(st.visible), str(st.instructions), str(st.contribution_types_json), str(st.tags_json)
         );
-        for (const q of all("SELECT * FROM stage_questions WHERE stage_id=? AND deleted_at IS NULL ORDER BY position", str(st.id))) {
-          run("INSERT INTO stage_questions(id,stage_id,position,text,required,visible) VALUES(?,?,?,?,?,?)", newId("que"), nid, num(q.position), str(q.text), num(q.required), q.visible === undefined ? 1 : num(q.visible));
+        const qMap = new Map<string, string>();
+        // parents first, so each sub-question can point at its parent's copy
+        for (const q of all("SELECT * FROM stage_questions WHERE stage_id=? AND deleted_at IS NULL ORDER BY (parent_id IS NOT NULL), position", str(st.id))) {
+          const parent = q.parent_id ? qMap.get(str(q.parent_id)) : null;
+          if (q.parent_id && !parent) continue; // sub-question of a removed question
+          const nq = newId("que");
+          qMap.set(str(q.id), nq);
+          run("INSERT INTO stage_questions(id,stage_id,position,text,required,visible,parent_id) VALUES(?,?,?,?,?,?,?)", nq, nid, num(q.position), str(q.text), num(q.required), q.visible === undefined ? 1 : num(q.visible), parent ?? null);
         }
         for (const r of all("SELECT * FROM stage_resources WHERE stage_id=? ORDER BY position", str(st.id))) {
           if (r.kind === "link") {

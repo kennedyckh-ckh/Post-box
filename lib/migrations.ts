@@ -430,4 +430,25 @@ ALTER TABLE stage_questions ADD COLUMN visible INTEGER NOT NULL DEFAULT 1;
 ALTER TABLE participants ADD COLUMN recovery_enc TEXT;
 `,
   },
+  {
+    id: "007_subquestions_and_timer",
+    sql: `
+-- Optional sub-questions: a guiding question may have child questions (one level only). A sub-question is shown to
+-- participants exactly when its parent is shown; its own visible column is not used.
+ALTER TABLE stage_questions ADD COLUMN parent_id TEXT;
+CREATE INDEX idx_stage_questions_parent ON stage_questions(parent_id);
+
+-- One countdown timer per session, started by a facilitator. Informational only: it never locks anything.
+-- Running: ends_at is set. Paused: remaining_ms is set and ends_at is NULL. Not started / reset: both NULL.
+CREATE TABLE session_timers(
+  session_id TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,
+  label TEXT NOT NULL DEFAULT '',
+  duration_ms INTEGER NOT NULL,
+  ends_at INTEGER,
+  remaining_ms INTEGER,
+  updated_by TEXT,
+  updated_at INTEGER NOT NULL
+);
+`,
+  },
 ];

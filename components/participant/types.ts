@@ -5,7 +5,7 @@ export interface Entry {
 }
 export interface StageDetail {
   stage: { id: string; title: string; instructions: string; tags: string[]; contributionTypes: string[]; availability: "open" | "closed"; canWrite: boolean; blockedReason: { code: string; message: string } | null };
-  questions: { id: string; text: string; required: boolean }[];
+  questions: { id: string; text: string; required: boolean; parentId: string | null }[];
   hiddenQuestions: number;
   resources: { id: string; kind: "link" | "file"; title: string; url: string | null; attachmentId: string | null; mime: string | null }[];
   reference: { stageId: string; title: string; source: "draft" | "submitted"; entries: Entry[]; synthesis: string | null }[];
@@ -18,7 +18,7 @@ export interface EntryList {
   etag: string; canWrite: boolean; availability: string; blockedReason: { code: string; message: string } | null; entries: Entry[]; synthesis: { body: string; version: number }; unchanged?: boolean;
   submission: { status: "draft" | "submitted" | "reopened"; revision: number; submittedAt: number | null; submittedByName: string | null };
   engagement: {
-    reactions: { enabled: boolean; types: { key: string; label: string }[] };
+    reactions: { enabled: boolean; types: { key: string; label: string; icon?: string }[] };
     critique: { enabled: boolean; prompts: { key: string; label: string }[] };
     byEntry: Record<string, { reactions: { counts: Record<string, number>; mine: string[]; total: number }; comments: { id: string; author: string; mine: boolean; promptKey: string; body: string; status: string; createdAt: number }[] }>;
   };

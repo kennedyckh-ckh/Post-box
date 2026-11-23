@@ -72,10 +72,11 @@ export function SignOutButton() {
   );
 }
 
-export function Shell({ children, title, wide, right }: { children: React.ReactNode; title?: string; wide?: boolean; right?: React.ReactNode }) {
+export function Shell({ children, title, wide, right, banner }: { children: React.ReactNode; title?: string; wide?: boolean; right?: React.ReactNode; banner?: React.ReactNode }) {
   return (
     <>
       <AppHeader right={right} />
+      {banner}
       <main id="main" className={`mx-auto w-full ${wide ? "max-w-6xl" : "max-w-xl"} px-4 py-8 sm:px-6 sm:py-12`}>
         {title && <h1 className="mb-6 text-3xl text-ink sm:text-[2.1rem]">{title}</h1>}
         {children}

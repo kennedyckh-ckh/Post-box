@@ -8,7 +8,7 @@ import type { Detail, Act } from "./types";
 interface StageFull {
   id: string; position: number; title: string; enabled: boolean; visible: boolean; availability: "locked" | "open" | "closed"; instructions: string;
   tags: string[]; contributionTypes: string[]; referenceStageIds: string[]; entryCount: number;
-  questions: { id: string; text: string; required: boolean; visible: boolean }[];
+  questions: { id: string; text: string; required: boolean; visible: boolean; parentId: string | null }[];
   resources: { id: string; kind: "link" | "file"; title: string; url: string | null; mime: string | null }[];
 }
 interface GS { groupId: string; stageId: string; availabilityOverride: "locked" | "open" | "closed" | null; excluded: boolean }
@@ -28,8 +28,12 @@ function StageCard({ st, all, d, gs, act, reload }: { st: StageFull; all: StageF
   const live = d.session.status === "live";
   const archived = d.session.status === "archived";
   const earlier = all.filter((o) => o.position < st.position);
-  const visibleCount = st.questions.filter((x) => x.visible).length;
-  const hiddenCount = st.questions.length - visibleCount;
+  const mains = st.questions.filter((x) => !x.parentId);
+  const visibleCount = mains.filter((x) => x.visible).length;
+  const hiddenCount = mains.length - visibleCount;
+  const [subFor, setSubFor] = useState<string | null>(null);
+  const [subText, setSubText] = useState("");
+  const [subReq, setSubReq] = useState(false);
   const run: Act = async (fn, ok) => { await act(fn, ok); reload(); };
   const setAvail = (a: string, confirmText: string) => {
     if (!confirm(confirmText)) return;
@@ -85,10 +89,10 @@ function StageCard({ st, all, d, gs, act, reload }: { st: StageFull; all: StageF
             <div>
               <h3 className="text-lg font-semibold text-ink">Guiding questions</h3>
               <p className="text-sm text-muted">
-                {st.questions.length === 0 ? "No questions yet. Add as many as you need." : <><strong className="text-ink">{visibleCount} of {st.questions.length}</strong> shown to participants. Hidden questions stay private until you reveal them.</>}
+                {mains.length === 0 ? "No questions yet. Add as many as you need, each with optional sub-questions." : <><strong className="text-ink">{visibleCount} of {mains.length}</strong> shown to participants. Hidden questions stay private until you reveal them.</>}
               </p>
             </div>
-            {st.questions.length > 0 && (
+            {mains.length > 0 && (
               <div className="flex flex-wrap gap-2" role="group" aria-label={`Reveal questions for ${st.title}`}>
                 <Button disabled={archived || hiddenCount === 0} onClick={() => void run(() => api("POST", `/stages/${st.id}/questions/reveal`, { mode: "next" }), "Next question revealed to participants.")}>Reveal next question{hiddenCount > 0 ? ` (${hiddenCount} hidden)` : ""}</Button>
                 <Button variant="secondary" disabled={archived || hiddenCount === 0} onClick={() => void run(() => api("POST", `/stages/${st.id}/questions/reveal`, { mode: "all" }), "All questions are now shown to participants.")}>Show all</Button>
@@ -97,24 +101,50 @@ function StageCard({ st, all, d, gs, act, reload }: { st: StageFull; all: StageF
             )}
           </div>
           <ol className="mb-4 space-y-2">
-            {st.questions.map((qq, i) => (
-              <li key={qq.id} className={`flex flex-wrap items-center gap-3 rounded-lg border p-3 ${qq.visible ? "border-line bg-surface" : "border-dashed border-line-strong bg-transparent"}`}>
-                <span aria-hidden="true" className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${qq.visible ? "bg-brand-strong text-white" : "bg-[#eeebe4] text-muted"}`}>{i + 1}</span>
-                <span className={`min-w-48 flex-1 ${qq.visible ? "text-ink" : "text-muted"}`}>{qq.text}</span>
-                <Badge tone={qq.visible ? "green" : "gray"}>{qq.visible ? "Shown" : "Hidden"}</Badge>
-                <Button variant={qq.visible ? "secondary" : "primary"} disabled={archived} aria-label={`${qq.visible ? "Hide" : "Reveal"} question ${i + 1}`} onClick={() => void run(() => api("PATCH", `/questions/${qq.id}`, { visible: !qq.visible }), qq.visible ? `Question ${i + 1} hidden from participants.` : `Question ${i + 1} revealed to participants.`)}>{qq.visible ? "Hide" : "Reveal"}</Button>
-                <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" className="h-5 w-5" checked={qq.required} disabled={archived} onChange={(e) => void run(() => api("PATCH", `/questions/${qq.id}`, { required: e.target.checked }))} /> Required</label>
-                <Button variant="ghost" disabled={archived} onClick={() => { if (confirm("Remove this question? Earlier entries keep their link to it.")) void run(() => api("DELETE", `/questions/${qq.id}`)); }}>Remove</Button>
-              </li>
-            ))}
+            {mains.map((qq, i) => {
+              const subs = st.questions.filter((x) => x.parentId === qq.id);
+              return (
+                <li key={qq.id} className={`rounded-lg border p-3 ${qq.visible ? "border-line bg-surface" : "border-dashed border-line-strong bg-transparent"}`}>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span aria-hidden="true" className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${qq.visible ? "bg-brand-strong text-white" : "bg-[#eeebe4] text-muted"}`}>{i + 1}</span>
+                    <span className={`min-w-48 flex-1 ${qq.visible ? "text-ink" : "text-muted"}`}>{qq.text}</span>
+                    <Badge tone={qq.visible ? "green" : "gray"}>{qq.visible ? "Shown" : "Hidden"}</Badge>
+                    <Button variant={qq.visible ? "secondary" : "primary"} disabled={archived} aria-label={`${qq.visible ? "Hide" : "Reveal"} question ${i + 1}`} onClick={() => void run(() => api("PATCH", `/questions/${qq.id}`, { visible: !qq.visible }), qq.visible ? `Question ${i + 1} hidden from participants.` : `Question ${i + 1} revealed to participants.`)}>{qq.visible ? "Hide" : "Reveal"}</Button>
+                    <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" className="h-5 w-5" checked={qq.required} disabled={archived} onChange={(e) => void run(() => api("PATCH", `/questions/${qq.id}`, { required: e.target.checked }))} /> Required</label>
+                    <Button variant="ghost" disabled={archived} onClick={() => { if (confirm(subs.length ? `Remove this question and its ${subs.length} sub-question${subs.length === 1 ? "" : "s"}? Earlier entries keep their link.` : "Remove this question? Earlier entries keep their link to it.")) void run(() => api("DELETE", `/questions/${qq.id}`)); }}>Remove</Button>
+                  </div>
+                  {subs.length > 0 && (
+                    <ol className="ml-10 mt-2 space-y-1.5 border-l-2 border-line pl-4" aria-label={`Sub-questions of question ${i + 1}`}>
+                      {subs.map((sq, k) => (
+                        <li key={sq.id} className="flex flex-wrap items-center gap-3">
+                          <span className="w-7 shrink-0 text-sm font-semibold text-muted">{i + 1}{String.fromCharCode(97 + k)}</span>
+                          <span className={`min-w-40 flex-1 text-sm ${qq.visible ? "text-ink" : "text-muted"}`}>{sq.text}</span>
+                          <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" className="h-5 w-5" checked={sq.required} disabled={archived} onChange={(e) => void run(() => api("PATCH", `/questions/${sq.id}`, { required: e.target.checked }))} /> Required</label>
+                          <Button variant="ghost" disabled={archived} aria-label={`Remove sub-question ${i + 1}${String.fromCharCode(97 + k)}`} onClick={() => { if (confirm("Remove this sub-question? Earlier entries keep their link to it.")) void run(() => api("DELETE", `/questions/${sq.id}`)); }}>Remove</Button>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                  {subFor === qq.id ? (
+                    <form className="ml-10 mt-2 flex flex-wrap items-end gap-2 border-l-2 border-line pl-4" onSubmit={(e) => { e.preventDefault(); if (!subText.trim()) return; void run(async () => { await api("POST", `/stages/${st.id}/questions`, { text: subText, parentId: qq.id, required: subReq }); setSubText(""); setSubReq(false); }, "Sub-question added."); }}>
+                      <div className="min-w-56 flex-1"><TextField label={`New sub-question for question ${i + 1}`} value={subText} onChange={setSubText} maxLength={500} /></div>
+                      <label className="mb-4 flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" className="h-5 w-5" checked={subReq} onChange={(e) => setSubReq(e.target.checked)} /> Required</label>
+                      <div className="mb-4 flex gap-2"><Button type="submit" disabled={archived || !subText.trim()}>Add</Button><Button variant="ghost" onClick={() => { setSubFor(null); setSubText(""); }}>Cancel</Button></div>
+                    </form>
+                  ) : (
+                    !archived && subs.length < 10 && <button type="button" className="ml-10 mt-1 min-h-9 rounded-md px-2 text-sm font-semibold text-brand-strong hover:bg-brand-soft" onClick={() => { setSubFor(qq.id); setSubText(""); setSubReq(false); }}>+ Add sub-question <span className="font-normal text-muted">(optional)</span></button>
+                  )}
+                </li>
+              );
+            })}
           </ol>
           <div className="flex flex-wrap items-end gap-x-4 gap-y-1">
-            <div className="min-w-64 flex-1"><TextField label="New question" value={q} onChange={setQ} maxLength={500} /></div>
+            <div className="min-w-64 flex-1"><TextField label="New main question" value={q} onChange={setQ} maxLength={500} /></div>
             <label className="mb-4 flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" className="h-5 w-5" checked={qHidden} onChange={(e) => setQHidden(e.target.checked)} /> Keep hidden until I reveal it</label>
             <label className="mb-4 flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" className="h-5 w-5" checked={qReq} onChange={(e) => setQReq(e.target.checked)} /> Required</label>
             <div className="mb-4"><Button disabled={archived || !q.trim()} onClick={() => void run(async () => { await api("POST", `/stages/${st.id}/questions`, { text: q, required: qReq, visible: !qHidden }); setQ(""); setQReq(false); }, qHidden ? "Question added (hidden until you reveal it)." : "Question added and shown to participants.")}>Add question</Button></div>
           </div>
-          <p className="text-sm text-muted">Required questions only count once they are shown. You can also reveal questions from the projector view.</p>
+          <p className="text-sm text-muted">Sub-questions are optional and appear together with their main question. Required questions only count once they are shown. You can also reveal questions from the projector view.</p>
         </div>
 
         <h3 className="mb-2 mt-8 text-lg font-semibold text-ink">Links and files</h3>

@@ -1,13 +1,14 @@
 "use client";
 import { use, useEffect, useState } from "react";
 import { ProjectorItemView } from "@/components/projector/shared-item";
+import { useRemaining, fmt, type TimerView } from "@/components/timer";
 
 interface Item {
   id: string; label: string; kind: string; stageTitle: string;
   entries: { questionText: string | null; kind: string; body: string; tags: string[]; table: { columns: string[]; rows: string[][] } | null; attachmentId: string | null }[];
   synthesis: string | null;
 }
-interface Data { title: string; items: Item[]; summaries: { id: string; label: string; text: string }[]; questions: { id: string; text: string }[] }
+interface Data { title: string; items: Item[]; summaries: { id: string; label: string; text: string }[]; questions: { id: string; text: string }[]; timer?: TimerView }
 
 /** Projector view: large text, no controls, no sign-in. It only ever receives what the facilitator approved for it. */
 export default function PresentPage({ params }: { params: Promise<{ token: string }> }) {
@@ -33,7 +34,10 @@ export default function PresentPage({ params }: { params: Promise<{ token: strin
       {err && <p role="status" className="mb-6 rounded-xl bg-amber-200 p-4 text-xl font-semibold text-slate-950">{err}</p>}
       {d && (
         <>
-          <h1 className="mb-[4vh] font-display text-[clamp(2rem,4vw,4rem)] font-semibold">{d.title}</h1>
+          <div className="mb-[4vh] flex flex-wrap items-center justify-between gap-4">
+            <h1 className="font-display text-[clamp(2rem,4vw,4rem)] font-semibold">{d.title}</h1>
+            <TimerChip t={d.timer ?? null} />
+          </div>
           {d.questions.length > 0 && (
             <section aria-label="Discussion questions" className="mb-[4vh] rounded-3xl bg-white/[0.07] p-[2.4vw] ring-1 ring-white/10">
               <h2 className="mb-4 text-[clamp(1rem,1.3vw,1.3rem)] font-semibold uppercase tracking-[0.2em] text-[#9fd0cb]">Let's discuss</h2>
@@ -57,5 +61,17 @@ export default function PresentPage({ params }: { params: Promise<{ token: strin
         </>
       )}
     </main>
+  );
+}
+
+function TimerChip({ t }: { t: TimerView | null }) {
+  const left = useRemaining(t);
+  if (!t || t.state === "idle") return null;
+  const done = t.state === "finished" || left === 0;
+  return (
+    <div role="timer" className={`flex items-center gap-3 rounded-2xl px-5 py-3 ring-1 ${done ? "bg-[#e8b384] text-[#0c1a20] ring-[#e8b384]" : "bg-white/10 ring-white/15"}`}>
+      <span className="text-[clamp(0.8rem,1vw,1rem)] uppercase tracking-[0.18em] opacity-70">{t.label || "Time left"}{t.state === "paused" ? " · paused" : ""}</span>
+      <span className="text-[clamp(1.6rem,3vw,3rem)] font-bold tabular-nums tracking-tight">{done ? "Time's up" : fmt(left)}</span>
+    </div>
   );
 }

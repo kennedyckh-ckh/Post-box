@@ -1,4 +1,5 @@
 import { all, get, run, tx, now, num, str, audit, type Row } from "../db";
+import { shownQuestions, hiddenTopLevelCount } from "../questions";
 import { newId, sha256 } from "../crypto";
 import { route, badRequest, conflict, notFound, forbidden, HttpError, type Ctx } from "../router";
 import { requireParticipant, type ParticipantCtx } from "../authz";
@@ -64,9 +65,9 @@ function stageDetail(pc: ParticipantCtx, stageId: string) {
       availability: a.availability, canWrite: a.canWrite, blockedReason: a.blocked,
     },
     // Only questions the facilitator has revealed. Hidden ones are not sent at all.
-    questions: all("SELECT id,text,required FROM stage_questions WHERE stage_id=? AND deleted_at IS NULL AND visible=1 ORDER BY position", str(st.id)).map((q) => ({ id: q.id, text: q.text, required: !!num(q.required) })),
+    questions: shownQuestions(str(st.id)).map((q) => ({ id: q.id, text: q.text, required: q.required, parentId: q.parentId })),
     // How many questions the facilitator is still holding back (a count only; their text is never sent).
-    hiddenQuestions: num(get("SELECT COUNT(*) AS c FROM stage_questions WHERE stage_id=? AND deleted_at IS NULL AND visible=0", str(st.id))!.c),
+    hiddenQuestions: hiddenTopLevelCount(str(st.id)),
     resources,
     reference,
     synthesis: synthesisOf(groupId, str(st.id)),
@@ -92,7 +93,7 @@ route("GET", "/stages/:sid/entries", (ctx) => {
   const ccfg = critiqueConfig(pc.session);
   const ids = rows.map((r) => str(r.id));
   // Revealing or hiding a question changes the tag, so open pages pick up newly revealed questions within seconds.
-  const qStamp = all("SELECT id FROM stage_questions WHERE stage_id=? AND deleted_at IS NULL AND visible=1 ORDER BY position", ctx.params.sid).map((q) => str(q.id)).join(",");
+  const qStamp = shownQuestions(ctx.params.sid).map((q) => `${q.id}:${q.text.length}`).join(",");
   const tag = etagFor(rows, syn, `${a.availability}:${a.canWrite}:${sub.status}:${sub.revision}:${engagementStamp("entry", ids)}:${rcfg.enabled}:${ccfg.enabled}:${qStamp}`);
   if (ctx.req.query.etag === tag) return { unchanged: true, etag: tag };
   const me = str(pc.participant.id);
@@ -122,9 +123,11 @@ function validateEntryInput(b: Record<string, unknown>, stage: Row, pc: Particip
   let questionId: string | null = null;
   if (b.questionId !== undefined && b.questionId !== null && b.questionId !== "") {
     // Hidden questions cannot be answered yet, except that an entry already linked to one may be edited and keep its link.
-    const q = get("SELECT id, visible FROM stage_questions WHERE id=? AND stage_id=? AND deleted_at IS NULL", str(b.questionId), str(stage.id));
-    if (!q || (!num(q.visible) && str(q.id) !== keepQuestionId)) throw badRequest("That question is not part of this part.");
-    questionId = str(q.id);
+    const qid = str(b.questionId);
+    const shown = shownQuestions(str(stage.id)).some((x) => x.id === qid);
+    const keep = qid === keepQuestionId && !!get("SELECT id FROM stage_questions WHERE id=? AND stage_id=?", qid, str(stage.id));
+    if (!shown && !keep) throw badRequest("That question is not part of this part.");
+    questionId = qid;
   }
   let attachmentId: string | null = null;
   if (b.attachmentId !== undefined && b.attachmentId !== null && b.attachmentId !== "") {

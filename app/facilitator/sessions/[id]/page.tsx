@@ -13,6 +13,7 @@ import { HistoryTab } from "@/components/facilitator/history-tab";
 import { SharingTab } from "@/components/facilitator/sharing-tab";
 import { AiTab } from "@/components/facilitator/ai-tab";
 import type { Detail } from "@/components/facilitator/types";
+import { FacilitatorTimer } from "@/components/timer";
 
 const TABS = [
   { key: "progress", label: "Progress" },
@@ -86,6 +87,8 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
           </div>
         </div>
       </Card>
+
+      <FacilitatorTimer sessionId={id} disabled={archived} />
 
       <div role="tablist" aria-label="Session sections" className="mb-6 flex flex-wrap gap-1 border-b border-line">
         {TABS.map((t) => (

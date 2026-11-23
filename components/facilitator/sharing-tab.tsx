@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, errText } from "@/lib/client/api";
 import { Card, Button, Alert, Badge, Field, TextField, inputCls } from "@/components/ui";
 import { TableView } from "@/components/participant/entry-view";
+import { ReactionIcon, ICON_CHOICES } from "@/components/reaction-icon";
 import type { Detail, Act } from "./types";
 
 interface Pub {
@@ -145,7 +146,7 @@ export function SharingTab({ d, act }: { d: Detail; act: Act }) {
 
 function EngagementSettings({ d, act }: { d: Detail; act: Act }) {
   const s = d.session;
-  type RC = { enabled: boolean; scope: string; types: { key?: string; label: string }[] };
+  type RC = { enabled: boolean; scope: string; types: { key?: string; label: string; icon?: string }[] };
   type CC = { enabled: boolean; scope: string; requireApproval: boolean; prompts: { key?: string; label: string; enabled: boolean }[] };
   const [r, setR] = useState<RC>(s.reactionConfig);
   const [c, setC] = useState<CC>(s.critiqueConfig);
@@ -160,8 +161,17 @@ function EngagementSettings({ d, act }: { d: Detail; act: Act }) {
         <label className="mb-3 flex min-h-11 items-center gap-2"><input type="checkbox" className="h-5 w-5" checked={r.enabled} onChange={(e) => setR({ ...r, enabled: e.target.checked })} /> Allow reactions</label>
         {scopeSel(r.scope, (x) => setR({ ...r, scope: x }), "Where reactions are allowed")}
         <p className="mb-1 text-sm font-semibold">Reaction types (up to 6)</p>
-        {r.types.map((t, i) => <div key={i} className="mb-2 flex gap-2"><input aria-label={`Reaction ${i + 1} label`} className={inputCls} maxLength={20} value={t.label} onChange={(e) => setR({ ...r, types: r.types.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)) })} /><Button variant="secondary" onClick={() => setR({ ...r, types: r.types.filter((_, j) => j !== i) })}>Remove</Button></div>)}
-        {r.types.length < 6 && <Button variant="secondary" onClick={() => setR({ ...r, types: [...r.types, { label: "" }] })}>Add a type</Button>}
+        {r.types.map((t, i) => (
+          <div key={i} className="mb-2 flex items-center gap-2">
+            <span aria-hidden="true" className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-line bg-surface-2 ${t.icon === "heart" ? "text-rose-700" : "text-brand-strong"}`}><ReactionIcon icon={t.icon} size={22} /></span>
+            <input aria-label={`Reaction ${i + 1} label`} className={`${inputCls.replace("w-full ", "")} min-w-0 flex-1`} maxLength={20} value={t.label} onChange={(e) => setR({ ...r, types: r.types.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)) })} />
+            <select aria-label={`Reaction ${i + 1} icon`} className={`${inputCls.replace("w-full ", "")} w-36 shrink-0`} value={t.icon ?? "star"} onChange={(e) => setR({ ...r, types: r.types.map((x, j) => (j === i ? { ...x, icon: e.target.value } : x)) })}>
+              {ICON_CHOICES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+            </select>
+            <Button variant="ghost" onClick={() => setR({ ...r, types: r.types.filter((_, j) => j !== i) })}>Remove</Button>
+          </div>
+        ))}
+        {r.types.length < 6 && <Button variant="secondary" onClick={() => setR({ ...r, types: [...r.types, { label: "", icon: "star" }] })}>Add a type</Button>}
         <div className="mt-3"><Button disabled={archived} onClick={() => void act(() => api("PATCH", `/sessions/${s.id}`, { reactionConfig: { ...r, types: r.types.filter((t) => t.label.trim()) } }), "Reaction settings saved.")}>Save reaction settings</Button></div>
       </Card>
       <Card>
