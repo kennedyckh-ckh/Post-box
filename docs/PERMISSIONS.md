@@ -26,6 +26,7 @@ A facilitator reaches a session only if they own it or were explicitly added. An
 | Look up a join code (title, group names, seats left; never PINs or members) | Yes (rate-limited) | n/a | n/a | n/a | n/a | n/a |
 | Join with code (+ PIN if the group has one) | Yes, if joining open and a seat is free (rate-limited) | n/a | n/a | n/a | n/a | n/a |
 | Recover with the private recovery code | Yes (rate-limited) | n/a | n/a | n/a | n/a | n/a |
+| View own recovery code (from own signed-in device) | – | Own | – | – | – | – |
 | Replace own recovery code | – | Own | – | – | – | – |
 | Issue a participant a new recovery code (old code and devices stop working) | – | – | – | Yes | Yes | – |
 | Close/open joining, new join code | – | – | – | Yes | Yes | – |
@@ -58,6 +59,7 @@ A facilitator reaches a session only if they own it or were explicitly added. An
 | Approve an item for the projector; create or revoke the projector link | – | – | – | Yes | Yes | – |
 | See the shared items (class board) | – | Yes | Yes | Yes | Yes | – |
 | See the projector page | Only with the secret link | n/a | n/a | n/a | n/a | n/a |
+| Open the signed-in projector view; reveal or hide guiding questions | – | – | – | Yes | Yes | – |
 | React to an entry in the group | – | Yes, if reactions are on for groups | – | – | – | – |
 | React to a shared item | – | Yes, if on for shared items | Yes | – | – | – |
 | Respond to a peer's entry / a shared item | – | Yes (not to their own entry) | Shared items only | – | – | – |

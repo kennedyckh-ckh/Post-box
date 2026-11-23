@@ -1,35 +1,84 @@
 @import "tailwindcss";
 
+/*
+ * Design tokens. A calm, editorial palette for classrooms and professional learning:
+ * warm paper surfaces, deep ink-teal for primary actions, and a restrained ochre accent for highlights.
+ * Token names are kept (brand, brand-strong, accent, line) so every page picks the new look up automatically.
+ */
 :root {
-  --background: #f3f5ff;
-  --foreground: #14183a;
-  --brand: #1d4ed8;
-  --brand-strong: #1e3a8a;
-  --accent: #6d28d9;
-  --line: #c7cfee;
+  --background: #f6f4ef;
+  --surface: #ffffff;
+  --surface-2: #faf8f4;
+  --foreground: #17212b;
+  --muted: #56606b;
+  --brand: #1d5c63;
+  --brand-strong: #123f45;
+  --brand-soft: #e5efee;
+  --accent: #b8692b;
+  --accent-soft: #f6ebdf;
+  --line: #e2ddd2;
+  --line-strong: #cfc8ba;
+  --ink: #0f1d24;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-muted: var(--muted);
   --color-brand: var(--brand);
   --color-brand-strong: var(--brand-strong);
+  --color-brand-soft: var(--brand-soft);
   --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
   --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --font-sans: var(--font-body), system-ui, -apple-system, "Segoe UI", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "Noto Sans CJK TC", sans-serif;
+  --font-display: var(--font-serif), "Noto Serif TC", "PingFang TC", "Microsoft JhengHei", Georgia, serif;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: radial-gradient(1200px 500px at 85% -10%, rgba(109, 40, 217, 0.07), transparent 60%), radial-gradient(900px 500px at -10% 0%, rgba(29, 78, 216, 0.08), transparent 60%), var(--background);
-  background-attachment: fixed;
+  background: var(--background);
   color: var(--foreground);
-  /* Latin and Traditional Chinese render with system fonts, so no character is ever replaced by a missing-glyph box. */
-  font-family: system-ui, -apple-system, "Segoe UI", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "Noto Sans CJK TC", sans-serif;
-  line-height: 1.5;
+  /* Latin uses the loaded web fonts; Traditional Chinese falls back to system fonts, so no character ever shows as a missing-glyph box. */
+  font-family: var(--font-sans);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2 {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+h1 { font-weight: 600; }
+h2 { font-weight: 600; }
+p, li { text-wrap: pretty; }
+
+::selection {
+  background: #cfe3e1;
+  color: var(--ink);
+}
+
+a { text-underline-offset: 3px; text-decoration-thickness: 1px; }
+
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--brand);
 }
 
 /* Visible keyboard focus everywhere (WCAG 2.4.7 / 2.4.11) */
 :focus-visible {
-  outline: 3px solid #f2a900;
+  outline: 3px solid #e0a100;
   outline-offset: 2px;
 }
 
@@ -46,6 +95,28 @@ body {
   left: 0.5rem;
   top: 0.5rem;
 }
+
+/* Subtle paper grain for the cover, drawn in CSS so nothing extra is downloaded. */
+.paper-grid {
+  background-image:
+    linear-gradient(to right, rgba(23, 33, 43, 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(23, 33, 43, 0.045) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* A newly revealed question gently draws the eye once. */
+@keyframes reveal-in {
+  from { opacity: 0; transform: translateY(6px); background-color: var(--accent-soft); }
+  60% { background-color: var(--accent-soft); }
+  to { opacity: 1; transform: none; background-color: transparent; }
+}
+.reveal-in { animation: reveal-in 1.6s ease-out both; }
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+.fade-up { animation: fade-up 0.5s ease-out both; }
 
 @media (prefers-reduced-motion: reduce) {
   * {

@@ -24,8 +24,8 @@ export default function BoardPage() {
   if (!b) return <Shell title="Class board">{error ? <Alert kind="error">{error}</Alert> : <p role="status">Loading…</p>}</Shell>;
   return (
     <Shell wide right={<LogoffButton />}>
-      <p className="mb-3"><Link href="/session" className="underline">← My session</Link></p>
-      <h1 className="mb-2 text-3xl font-bold text-brand-strong">Shared with the class</h1>
+      <p className="mb-4 text-sm"><Link href="/session" className="font-semibold text-muted hover:text-brand-strong">← My session</Link></p>
+      <h1 className="mb-2 text-3xl text-ink sm:text-[2.1rem]">Shared with the class</h1>
       <p className="mb-6 text-slate-800">Your facilitator chose these items to share. Names are not shown unless your facilitator chose to show a group name.</p>
       {error && <Alert kind="error">{error}</Alert>}
       {b.questions.length > 0 && (
@@ -54,13 +54,13 @@ export default function BoardPage() {
                     </div>
                   ))}
                   {it.ai && (
-                    <div className="rounded-lg bg-indigo-50 p-3">
+                    <div className="rounded-lg bg-brand-soft p-3">
                       <p className="mb-1 text-sm font-semibold">{it.ai.label}</p>
                       <p className="mb-2">{it.ai.overview}</p>
                       <ul className="list-disc space-y-1 pl-5">{it.ai.points.map((p, i) => <li key={i}><strong>{p.heading}:</strong> {p.text}</li>)}</ul>
                     </div>
                   )}
-                  {it.synthesis && <p className="rounded-lg bg-indigo-50 p-3"><strong>Group response:</strong> {it.synthesis}</p>}
+                  {it.synthesis && <p className="rounded-lg bg-brand-soft p-3"><strong>Group response:</strong> {it.synthesis}</p>}
                 </div>
                 {b.reactions.enabled && <ReactionBar targetType="publication" targetId={it.id} types={b.reactions.types} summary={it.reactions} onChange={load} />}
                 <CommentList comments={it.comments} onChange={load} />

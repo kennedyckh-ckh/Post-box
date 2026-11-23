@@ -17,7 +17,7 @@ export default function AdminPage() {
 
   return (
     <Shell wide title="Administration" right={<SignOutButton />}>
-      <p className="mb-4"><Link href="/facilitator" className="underline">← Your sessions</Link></p>
+      <p className="mb-4 text-sm"><Link href="/facilitator" className="font-semibold text-muted hover:text-brand-strong">← Your sessions</Link></p>
       {error && <Alert kind="error">{error}</Alert>}
       {temp && <Alert kind="warning">Temporary password for {temp.who}: <span className="select-all font-mono font-bold">{temp.pw}</span>. It is shown only once. Give it to them privately; they must choose their own at first sign-in.</Alert>}
       <Card className="mb-6">

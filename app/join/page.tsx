@@ -24,8 +24,6 @@ export default function JoinPage() {
   const [extra, setExtra] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [recovery, setRecovery] = useState("");
-  const [saved, setSaved] = useState(false);
 
   async function lookup(e: React.FormEvent) {
     e.preventDefault();
@@ -45,31 +43,14 @@ export default function JoinPage() {
     setError("");
     setBusy(true);
     try {
-      const r = await api<{ recoveryCode: string }>("POST", "/join", { joinCode: code, displayName: name, groupId: groupId || undefined, pin: pin || undefined, extra });
-      setRecovery(r.recoveryCode);
+      await api("POST", "/join", { joinCode: code, displayName: name, groupId: groupId || undefined, pin: pin || undefined, extra });
+      // No recovery code at the door: participants go straight to their session and can look the code up there later.
+      router.push("/session?welcome=1");
     } catch (err) {
       setError(errText(err));
     } finally {
       setBusy(false);
     }
-  }
-
-  if (recovery) {
-    return (
-      <Shell title="You have joined">
-        <Card>
-          <h2 className="text-xl font-semibold">Save your recovery code</h2>
-          <p className="mt-2">This code lets you get back to your work from another phone or computer. <strong>It is shown only once.</strong> Typing your name is not enough to get back in, so keep this code private.</p>
-          <p className="my-4 select-all rounded-lg bg-slate-100 p-4 text-center font-mono text-2xl font-bold tracking-widest" aria-label={`Your recovery code is ${recovery.split("").join(" ")}`}>{recovery}</p>
-          <p className="mb-4 text-sm text-slate-700">Write it down or take a screenshot. If you lose it and your device is signed out, ask your facilitator for a new one.</p>
-          <label className="mb-4 flex min-h-11 items-center gap-3">
-            <input type="checkbox" className="h-5 w-5" checked={saved} onChange={(e) => setSaved(e.target.checked)} />
-            <span>I have saved my recovery code</span>
-          </label>
-          <Button disabled={!saved} onClick={() => router.push("/session")}>Continue to my session</Button>
-        </Card>
-      </Shell>
-    );
   }
 
   return (
@@ -115,12 +96,12 @@ export default function JoinPage() {
             ) : (
               <Alert kind="info">Your facilitator will place you in a group after you join.</Alert>
             )}
-            <p className="mb-4 text-sm text-slate-800">Your facilitator and your group will see your name and what you write. <Link href="/notice" target="_blank" rel="noopener noreferrer" className="font-semibold underline">Read how your information is used (opens in a new tab)</Link>.</p>
+            <p className="mb-4 text-sm text-muted">Your facilitator and your group will see your name and what you write. After joining, you can find your private recovery code on your session page whenever you need it. <Link href="/notice" target="_blank" rel="noopener noreferrer" className="font-semibold underline">Read how your information is used (opens in a new tab)</Link>.</p>
             <Button type="submit" disabled={busy || !name.trim() || (info.groupJoinMode === "choose" && !groupId)}>{busy ? "Joining…" : "Join"}</Button>
           </form>
         </Card>
       )}
-      <p className="mt-6 text-sm">
+      <p className="mt-6 text-sm text-muted">
         Already joined? <Link href="/recover" className="font-semibold underline">Use your recovery code</Link> · <Link href="/" className="underline">Back</Link>
       </p>
     </Shell>

@@ -96,7 +96,7 @@ export function ProgressTab({ d, act }: { d: Detail; act: Act }) {
               <div className="mt-2"><Button variant="secondary" disabled={archived} onClick={() => { if (confirm(`Share version ${v.revision} with the whole class? It becomes a frozen copy. Check the text for anything that could identify someone.`)) void run(() => api("POST", `/sessions/${d.session.id}/publications`, { sourceType: "submission", sourceId: v.id, labelMode: d.session.anonymiseDefault ? "anonymous" : "group" }), "Shared with the class. Manage it on the Sharing tab."); }}>Share this version with the class</Button></div>
               <ul className="mt-2 space-y-2 text-sm">
                 {v.snapshot?.entries.map((e, i) => <li key={i} className="rounded bg-slate-50 p-2"><strong>{e.authorName}</strong>{e.questionText && <> · re: {e.questionText}</>}: {e.body}{e.table && <> [table: {e.table.columns.join(", ")}; {e.table.rows.length} rows]</>}{e.tags.length > 0 && <> · {e.tags.join(", ")}</>}</li>)}
-                {v.snapshot?.synthesis?.body && <li className="rounded bg-indigo-50 p-2"><strong>Group response:</strong> {v.snapshot.synthesis.body}</li>}
+                {v.snapshot?.synthesis?.body && <li className="rounded bg-brand-soft p-2"><strong>Group response:</strong> {v.snapshot.synthesis.body}</li>}
               </ul>
             </details>
           ))}

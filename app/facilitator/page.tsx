@@ -114,8 +114,8 @@ export default function FacilitatorHome() {
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <p>Signed in as <strong>{user.name}</strong> ({user.email})</p>
         <div className="flex gap-2">
-          <Link href="/facilitator/ai-usage" className="inline-flex min-h-11 items-center rounded-lg border border-brand px-4 font-semibold text-brand-strong">AI usage</Link>
-          {user.isAdmin && <Link href="/facilitator/admin" className="inline-flex min-h-11 items-center rounded-lg border border-brand px-4 font-semibold text-brand-strong">Administration</Link>}
+          <Link href="/facilitator/ai-usage" className="inline-flex min-h-11 items-center rounded-lg border border-line-strong bg-surface px-4 text-sm font-semibold text-brand-strong transition hover:border-brand hover:bg-brand-soft">AI usage</Link>
+          {user.isAdmin && <Link href="/facilitator/admin" className="inline-flex min-h-11 items-center rounded-lg border border-line-strong bg-surface px-4 text-sm font-semibold text-brand-strong transition hover:border-brand hover:bg-brand-soft">Administration</Link>}
         </div>
       </div>
       {error && <Alert kind="error">{error}</Alert>}

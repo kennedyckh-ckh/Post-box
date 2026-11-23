@@ -65,6 +65,8 @@ function stageDetail(pc: ParticipantCtx, stageId: string) {
     },
     // Only questions the facilitator has revealed. Hidden ones are not sent at all.
     questions: all("SELECT id,text,required FROM stage_questions WHERE stage_id=? AND deleted_at IS NULL AND visible=1 ORDER BY position", str(st.id)).map((q) => ({ id: q.id, text: q.text, required: !!num(q.required) })),
+    // How many questions the facilitator is still holding back (a count only; their text is never sent).
+    hiddenQuestions: num(get("SELECT COUNT(*) AS c FROM stage_questions WHERE stage_id=? AND deleted_at IS NULL AND visible=0", str(st.id))!.c),
     resources,
     reference,
     synthesis: synthesisOf(groupId, str(st.id)),

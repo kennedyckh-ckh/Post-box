@@ -94,7 +94,7 @@ export default function AiUsagePage() {
   const s = u.status;
   return (
     <Shell wide title="AI usage" right={<SignOutButton />}>
-      <p className="mb-4"><Link href="/facilitator" className="underline">← Your sessions</Link></p>
+      <p className="mb-4 text-sm"><Link href="/facilitator" className="font-semibold text-muted hover:text-brand-strong">← Your sessions</Link></p>
       {err && <Alert kind="error">{err}</Alert>}
       <Card className="mb-6">
         <h2 className="mb-2 text-xl font-semibold">Connection</h2>
@@ -119,7 +119,7 @@ export default function AiUsagePage() {
         <Recent r={u.mine} />
         {/* a file download, not a page link */}
         {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-        <a className="inline-flex min-h-11 items-center rounded-lg border border-brand px-4 font-semibold text-brand-strong" href="/api/ai/usage/export">Download my usage as CSV (details only)</a>
+        <a className="inline-flex min-h-11 items-center rounded-lg border border-line-strong bg-surface px-4 text-sm font-semibold text-brand-strong transition hover:border-brand hover:bg-brand-soft" href="/api/ai/usage/export">Download my usage as CSV (details only)</a>
       </section>
 
       {u.isAdmin && u.everyone && (
@@ -136,7 +136,7 @@ export default function AiUsagePage() {
           <Breakdown title="By facilitator" rows={u.everyone.byFacilitator} />
           <Recent r={u.everyone} withWho />
           {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-          <a className="inline-flex min-h-11 items-center rounded-lg border border-brand px-4 font-semibold text-brand-strong" href="/api/ai/usage/export?scope=all">Download everyone's usage as CSV (details only)</a>
+          <a className="inline-flex min-h-11 items-center rounded-lg border border-line-strong bg-surface px-4 text-sm font-semibold text-brand-strong transition hover:border-brand hover:bg-brand-soft" href="/api/ai/usage/export?scope=all">Download everyone's usage as CSV (details only)</a>
         </section>
       )}
     </Shell>

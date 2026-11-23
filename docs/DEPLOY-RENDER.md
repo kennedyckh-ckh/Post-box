@@ -49,6 +49,7 @@ The app never switches to the demo by itself when live AI fails.
 The database and the pictures are on the disk. A disk is not a backup. Do at least one of these (and check Render's own disk snapshot options on the Disks tab):
 - **Make a backup (safe while the app is running).** In Render open the service's **Shell** and run `npm run backup`. It prints the folder it made (inside `/var/data/backups/`) and checks the copy. Download it somewhere safe. Backups contain personal data: keep them as protected as the live data.
 - **Restore.** In the Shell run `npm run restore -- /var/data/backups/backup-<the folder name>`. The current data is not deleted; it is moved to `/var/data/replaced-<time>/`. Then **restart the service straight away** (the running app still has the old files open until it restarts, so anything people save between the restore and the restart is lost; tell participants to stop first). A damaged backup is refused and nothing is changed.
+- The file `/var/data/secret.key` is the key that lets participants see their recovery code again. Backups deliberately leave it out (so a backup alone cannot reveal codes). Keep it on the disk; if it is ever lost, participants just choose “Make a new code” on their session page.
 - Deleting a session in the app does **not** delete backups made earlier. Delete old backups yourself when your retention rules say so.
 - Rehearse a restore once, with a test session, before you need it.
 

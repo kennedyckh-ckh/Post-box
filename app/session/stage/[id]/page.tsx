@@ -64,6 +64,13 @@ export default function StagePage({ params }: { params: Promise<{ id: string }> 
   }, [editing, id]);
 
   const qText = (qid: string | null) => detail?.questions.find((q) => q.id === qid)?.text;
+  // Questions already on screen at first load are not highlighted; ones the facilitator reveals later are, once.
+  const seenQ = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    if (!detail) return;
+    const t = setTimeout(() => { seenQ.current = new Set([...(seenQ.current ?? []), ...detail.questions.map((q) => q.id)]); }, seenQ.current === null ? 0 : 2000);
+    return () => clearTimeout(t);
+  }, [detail]);
 
   if (error && !detail) return <Shell title="This part"><Alert kind="warning">{error}</Alert><Link href="/session" className="underline">Back to my session</Link></Shell>;
   if (!detail || !list) return <Shell title="Loading…"><p role="status">Loading…</p></Shell>;
@@ -72,9 +79,9 @@ export default function StagePage({ params }: { params: Promise<{ id: string }> 
 
   return (
     <Shell wide right={<LogoffButton />}>
-      <p className="mb-3"><Link href="/session" className="underline">← My session</Link></p>
+      <p className="mb-4 text-sm"><Link href="/session" className="font-semibold text-muted hover:text-brand-strong">← My session</Link></p>
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <h1 className="text-3xl font-bold text-brand-strong">{st.title}</h1>
+        <h1 className="text-3xl text-ink sm:text-[2.1rem]">{st.title}</h1>
         <Badge tone={canWrite ? "green" : "amber"}>{canWrite ? "Open: you can add and edit" : st.availability === "closed" ? "Closed: read only" : "Read only"}</Badge>
       </div>
       {offline && <Alert kind="warning">You appear to be offline. Entries already saved are safe. We will keep trying to reconnect.</Alert>}
@@ -86,15 +93,23 @@ export default function StagePage({ params }: { params: Promise<{ id: string }> 
         <div className="space-y-6 lg:col-span-2">
           <Card>
             {st.instructions && <p className="mb-3 whitespace-pre-wrap">{st.instructions}</p>}
-            {detail.questions.length > 0 && (
+            {(detail.questions.length > 0 || detail.hiddenQuestions > 0) && (
               <>
-                <h2 className="mb-1 text-lg font-semibold">Guiding questions</h2>
-                <ol className="mb-3 list-decimal pl-6">{detail.questions.map((q) => <li key={q.id}>{q.text} {q.required && <Badge tone="amber">Required</Badge>}</li>)}</ol>
+                <h2 className="mb-2 text-xl text-ink">Guiding questions</h2>
+                <ol className="mb-3 space-y-2" aria-live="polite">
+                  {detail.questions.map((q, i) => (
+                    <li key={q.id} className={`flex gap-3 rounded-lg px-2 py-1.5 ${seenQ.current !== null && !seenQ.current.has(q.id) ? "reveal-in" : ""}`}>
+                      <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-strong text-sm font-semibold text-white">{i + 1}</span>
+                      <span className="pt-0.5 text-ink"><span className="sr-only">Question {i + 1}: </span>{q.text} {q.required && <Badge tone="amber">Required</Badge>}</span>
+                    </li>
+                  ))}
+                </ol>
+                {detail.hiddenQuestions > 0 && <p className="mb-3 flex items-center gap-2 text-sm text-muted"><span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-accent" />{detail.questions.length === 0 ? "Your facilitator will reveal the questions for this part soon." : "More questions will appear here when your facilitator reveals them."}</p>}
               </>
             )}
             {detail.resources.length > 0 && (
               <>
-                <h2 className="mb-1 text-lg font-semibold">Resources</h2>
+                <h2 className="mb-1 text-xl text-ink">Resources</h2>
                 <ul className="list-disc pl-6">
                   {detail.resources.map((r) => (
                     <li key={r.id}>
@@ -149,7 +164,7 @@ export default function StagePage({ params }: { params: Promise<{ id: string }> 
               <summary className="cursor-pointer font-semibold">Reference: {r.title} <Badge tone={r.source === "submitted" ? "green" : "amber"}>{r.source === "submitted" ? "Submitted snapshot" : "Current draft, not submitted"}</Badge></summary>
               <p className="mt-2 text-sm text-slate-700">Your group's earlier work, for reference only. It is separate from this part.</p>
               {r.entries.length === 0 ? <p className="mt-2 text-sm">No entries.</p> : <ul className="mt-2 space-y-2">{r.entries.map((e) => <li key={e.id} className="rounded-lg bg-slate-50 p-2 text-sm"><strong>{e.authorName}:</strong> <EntryBody e={e} /></li>)}</ul>}
-              {r.synthesis && <p className="mt-2 rounded-lg bg-indigo-50 p-2 text-sm"><strong>Group response:</strong> {r.synthesis}</p>}
+              {r.synthesis && <p className="mt-2 rounded-lg bg-brand-soft p-2 text-sm"><strong>Group response:</strong> {r.synthesis}</p>}
             </details>
           )) : <Card><p className="text-sm">No reference material for this part.</p></Card>}
         </aside>

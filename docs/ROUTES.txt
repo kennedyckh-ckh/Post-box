@@ -36,6 +36,7 @@ GET    /api/health
 POST   /api/join
 POST   /api/leave
 GET    /api/me
+GET    /api/me/recovery-code
 POST   /api/me/recovery-code
 POST   /api/participants/:pid/move
 POST   /api/participants/:pid/recovery-code
@@ -78,6 +79,7 @@ GET    /api/sessions/:id/presentation
 POST   /api/sessions/:id/presentation
 POST   /api/sessions/:id/presentation/link
 POST   /api/sessions/:id/presentation/revoke
+GET    /api/sessions/:id/projector
 GET    /api/sessions/:id/publications
 POST   /api/sessions/:id/publications
 POST   /api/sessions/:id/restore
@@ -90,6 +92,7 @@ GET    /api/stages/:sid/entries
 POST   /api/stages/:sid/entries
 POST   /api/stages/:sid/presence
 POST   /api/stages/:sid/questions
+POST   /api/stages/:sid/questions/reveal
 POST   /api/stages/:sid/resources
 POST   /api/stages/:sid/resources/file   (raw upload)
 GET    /api/stages/:sid/submission
