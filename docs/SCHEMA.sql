@@ -301,7 +301,7 @@ CREATE TABLE stage_questions(
   position INTEGER NOT NULL,
   text TEXT NOT NULL,
   required INTEGER NOT NULL DEFAULT 0
-, deleted_at INTEGER, visible INTEGER NOT NULL DEFAULT 1, parent_id TEXT);
+, deleted_at INTEGER, visible INTEGER NOT NULL DEFAULT 1, parent_id TEXT, heading TEXT NOT NULL DEFAULT '');
 
 CREATE TABLE stage_resources(
   id TEXT PRIMARY KEY,

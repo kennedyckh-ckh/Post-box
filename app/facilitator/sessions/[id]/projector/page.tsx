@@ -8,7 +8,7 @@ import { useRemaining, fmt, type TimerView } from "@/components/timer";
 
 interface PStage {
   id: string; position: number; title: string; visible: boolean; availability: "locked" | "open" | "closed"; instructions: string;
-  questions: { id: string; text: string; required: boolean; parentId: string | null }[]; hiddenQuestions: number;
+  questions: { id: string; heading?: string; text: string; required: boolean; parentId: string | null }[]; hiddenQuestions: number;
   expected: number; submitted: number; perGroup: { groupId: string; status: "draft" | "submitted" | "reopened"; entries: number; expected: boolean }[];
 }
 interface Feed {
@@ -215,7 +215,10 @@ export default function ProjectorPage({ params }: { params: Promise<{ id: string
                           <li key={q.id} className={`rounded-2xl px-3 py-2 ${seen.current !== null && !seen.current.has(q.id) ? "fade-up" : ""}`}>
                             <div className="flex gap-[1.6vw]">
                               <span aria-hidden="true" className="mt-1 flex h-[clamp(2.4rem,3.6vw,3.6rem)] w-[clamp(2.4rem,3.6vw,3.6rem)] shrink-0 items-center justify-center rounded-full bg-[#9fd0cb] font-display text-[clamp(1.2rem,2vw,2rem)] font-semibold text-[#0c1a20]">{i + 1}</span>
-                              <p className="text-[clamp(1.6rem,3vw,3.2rem)] leading-tight text-white">{q.text}</p>
+                              <div>
+                                {q.heading && <p className="mb-1 text-[clamp(0.9rem,1.3vw,1.35rem)] font-semibold uppercase tracking-[0.18em] text-[#e8b384]">{q.heading}</p>}
+                                <p className="text-[clamp(1.6rem,3vw,3.2rem)] leading-tight text-white">{q.text}</p>
+                              </div>
                             </div>
                             {subs.length > 0 && (
                               <ol className="ml-[clamp(3.2rem,5.2vw,5.2rem)] mt-[1.4vh] space-y-[1vh] border-l-2 border-white/15 pl-[1.4vw]">

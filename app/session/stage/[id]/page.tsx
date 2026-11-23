@@ -104,7 +104,10 @@ export default function StagePage({ params }: { params: Promise<{ id: string }> 
                       <li key={q.id} className={`rounded-lg px-2 py-1.5 ${seenQ.current !== null && !seenQ.current.has(q.id) ? "reveal-in" : ""}`}>
                         <div className="flex gap-3">
                           <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-strong text-sm font-semibold text-white">{i + 1}</span>
-                          <span className="pt-0.5 text-ink"><span className="sr-only">Question {i + 1}: </span>{q.text} {q.required && <Badge tone="amber">Required</Badge>}</span>
+                          <span className="pt-0.5 text-ink">
+                            {q.heading && <span className="mb-0.5 block text-xs font-semibold uppercase tracking-[0.12em] text-accent">{q.heading}</span>}
+                            <span className="sr-only">Question {i + 1}: </span>{q.text} {q.required && <Badge tone="amber">Required</Badge>}
+                          </span>
                         </div>
                         {subs.length > 0 && (
                           <ol className="ml-10 mt-2 space-y-1.5 border-l-2 border-line pl-4">

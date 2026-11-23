@@ -60,7 +60,7 @@ export interface Snapshot {
 /** The group's visible work for a stage, as it is right now. Call inside a write transaction to freeze it consistently. */
 export function buildSnapshot(groupId: string, stageId: string, now: number): Snapshot {
   const stage = get("SELECT * FROM stages WHERE id=?", stageId)!;
-  const questions = shownQuestions(stageId).map((q) => ({ id: q.id, text: q.text, required: q.required, parentId: q.parentId }));
+  const questions = shownQuestions(stageId).map((q) => ({ id: q.id, heading: q.heading, text: q.text, required: q.required, parentId: q.parentId }));
   const qText = new Map(all("SELECT id,text FROM stage_questions WHERE stage_id=?", stageId).map((q) => [str(q.id), str(q.text)]));
   const entries = all("SELECT * FROM entries WHERE group_id=? AND stage_id=? AND deleted_at IS NULL AND hidden_at IS NULL ORDER BY created_at, id", groupId, stageId).map((e): SnapEntry => {
     const att = e.attachment_id ? get("SELECT id,original_name,mime FROM attachments WHERE id=? AND deleted_at IS NULL", str(e.attachment_id)) : undefined;

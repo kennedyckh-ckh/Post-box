@@ -65,7 +65,7 @@ function stageDetail(pc: ParticipantCtx, stageId: string) {
       availability: a.availability, canWrite: a.canWrite, blockedReason: a.blocked,
     },
     // Only questions the facilitator has revealed. Hidden ones are not sent at all.
-    questions: shownQuestions(str(st.id)).map((q) => ({ id: q.id, text: q.text, required: q.required, parentId: q.parentId })),
+    questions: shownQuestions(str(st.id)).map((q) => ({ id: q.id, heading: q.heading, text: q.text, required: q.required, parentId: q.parentId })),
     // How many questions the facilitator is still holding back (a count only; their text is never sent).
     hiddenQuestions: hiddenTopLevelCount(str(st.id)),
     resources,
@@ -93,7 +93,7 @@ route("GET", "/stages/:sid/entries", (ctx) => {
   const ccfg = critiqueConfig(pc.session);
   const ids = rows.map((r) => str(r.id));
   // Revealing or hiding a question changes the tag, so open pages pick up newly revealed questions within seconds.
-  const qStamp = shownQuestions(ctx.params.sid).map((q) => `${q.id}:${q.text.length}`).join(",");
+  const qStamp = sha256(JSON.stringify(shownQuestions(ctx.params.sid).map((q) => [q.id, q.heading, q.text, q.required]))).slice(0, 16);
   const tag = etagFor(rows, syn, `${a.availability}:${a.canWrite}:${sub.status}:${sub.revision}:${engagementStamp("entry", ids)}:${rcfg.enabled}:${ccfg.enabled}:${qStamp}`);
   if (ctx.req.query.etag === tag) return { unchanged: true, etag: tag };
   const me = str(pc.participant.id);
