@@ -28,13 +28,13 @@ export default function RecoverPage() {
   return (
     <Shell title="Get back to your work">
       <Card>
-        <p className="mb-4">Enter the recovery code you were shown when you joined. It looks like <span className="font-mono">ABCD-EFGH-JKLM-NPQR</span>. Your name alone cannot be used to sign back in.</p>
+        <p className="mb-4">Enter your private recovery code. It looks like <span className="font-mono">ABCD-EFGH-JKLM-NPQR</span>. You can find it on your session page, under “Your recovery code”, on any device where you are still signed in. Your name alone cannot be used to sign back in.</p>
         {error && <Alert kind="error">{error}</Alert>}
         <form onSubmit={submit}>
           <TextField label="Recovery code" value={code} onChange={setCode} autoComplete="off" required />
           <Button type="submit" disabled={busy || !code.trim()}>{busy ? "Checking…" : "Recover my session"}</Button>
         </form>
-        <p className="mt-4 text-sm">Lost the code? Ask your facilitator to issue a new one. <Link href="/" className="underline">Back</Link></p>
+        <p className="mt-4 text-sm text-muted">Lost the code and no longer signed in anywhere? Ask your facilitator to issue a new one. <Link href="/" className="underline">Back</Link></p>
       </Card>
     </Shell>
   );

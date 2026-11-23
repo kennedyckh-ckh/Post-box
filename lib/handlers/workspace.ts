@@ -63,7 +63,10 @@ function stageDetail(pc: ParticipantCtx, stageId: string) {
       id: st.id, title: st.title, instructions: st.instructions, tags: parseJson<string[]>(st.tags_json, []), contributionTypes: parseJson<string[]>(st.contribution_types_json, []),
       availability: a.availability, canWrite: a.canWrite, blockedReason: a.blocked,
     },
-    questions: all("SELECT id,text,required FROM stage_questions WHERE stage_id=? AND deleted_at IS NULL ORDER BY position", str(st.id)).map((q) => ({ id: q.id, text: q.text, required: !!num(q.required) })),
+    // Only questions the facilitator has revealed. Hidden ones are not sent at all.
+    questions: all("SELECT id,text,required FROM stage_questions WHERE stage_id=? AND deleted_at IS NULL AND visible=1 ORDER BY position", str(st.id)).map((q) => ({ id: q.id, text: q.text, required: !!num(q.required) })),
+    // How many questions the facilitator is still holding back (a count only; their text is never sent).
+    hiddenQuestions: num(get("SELECT COUNT(*) AS c FROM stage_questions WHERE stage_id=? AND deleted_at IS NULL AND visible=0", str(st.id))!.c),
     resources,
     reference,
     synthesis: synthesisOf(groupId, str(st.id)),
@@ -88,7 +91,9 @@ route("GET", "/stages/:sid/entries", (ctx) => {
   const rcfg = reactionConfig(pc.session);
   const ccfg = critiqueConfig(pc.session);
   const ids = rows.map((r) => str(r.id));
-  const tag = etagFor(rows, syn, `${a.availability}:${a.canWrite}:${sub.status}:${sub.revision}:${engagementStamp("entry", ids)}:${rcfg.enabled}:${ccfg.enabled}`);
+  // Revealing or hiding a question changes the tag, so open pages pick up newly revealed questions within seconds.
+  const qStamp = all("SELECT id FROM stage_questions WHERE stage_id=? AND deleted_at IS NULL AND visible=1 ORDER BY position", ctx.params.sid).map((q) => str(q.id)).join(",");
+  const tag = etagFor(rows, syn, `${a.availability}:${a.canWrite}:${sub.status}:${sub.revision}:${engagementStamp("entry", ids)}:${rcfg.enabled}:${ccfg.enabled}:${qStamp}`);
   if (ctx.req.query.etag === tag) return { unchanged: true, etag: tag };
   const me = str(pc.participant.id);
   const groupOn = (sc: string) => sc === "group" || sc === "both";
@@ -102,7 +107,7 @@ route("GET", "/stages/:sid/entries", (ctx) => {
   return { etag: tag, canWrite: a.canWrite, availability: a.availability, blockedReason: a.blocked, entries: rows.map((e) => entryForParticipant(e, me)), synthesis: syn, engagement, submission: { status: sub.status, revision: sub.revision, submittedAt: sub.submittedAt, submittedByName: sub.submittedByName } };
 });
 
-function validateEntryInput(b: Record<string, unknown>, stage: Row, pc: ParticipantCtx) {
+function validateEntryInput(b: Record<string, unknown>, stage: Row, pc: ParticipantCtx, keepQuestionId: string | null = null) {
   const types = parseJson<string[]>(stage.contribution_types_json, []);
   const kind = b.kind === "table" ? "table" : "text";
   if (!types.includes(kind)) throw badRequest(`${kind === "table" ? "Tables are" : "Text is"} not allowed in this part.`);
@@ -116,8 +121,9 @@ function validateEntryInput(b: Record<string, unknown>, stage: Row, pc: Particip
   }
   let questionId: string | null = null;
   if (b.questionId !== undefined && b.questionId !== null && b.questionId !== "") {
-    const q = get("SELECT id FROM stage_questions WHERE id=? AND stage_id=? AND deleted_at IS NULL", str(b.questionId), str(stage.id));
-    if (!q) throw badRequest("That question is not part of this part.");
+    // Hidden questions cannot be answered yet, except that an entry already linked to one may be edited and keep its link.
+    const q = get("SELECT id, visible FROM stage_questions WHERE id=? AND stage_id=? AND deleted_at IS NULL", str(b.questionId), str(stage.id));
+    if (!q || (!num(q.visible) && str(q.id) !== keepQuestionId)) throw badRequest("That question is not part of this part.");
     questionId = str(q.id);
   }
   let attachmentId: string | null = null;
@@ -177,7 +183,7 @@ route("PATCH", "/entries/:id", (ctx) => {
   hit(`entry:${pc.participant.id}`, 120, 60_000);
   const b = obj(ctx.req.body);
   const base = int(b.baseVersion, "baseVersion", { min: 1 })!;
-  const c = validateEntryInput(b, a.stage, pc);
+  const c = validateEntryInput(b, a.stage, pc, e0.question_id ? str(e0.question_id) : null);
   return tx(() => {
     const cur = get("SELECT * FROM entries WHERE id=? AND deleted_at IS NULL", str(e0.id))!;
     const me = str(pc.participant.id);

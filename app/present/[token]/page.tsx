@@ -1,5 +1,6 @@
 "use client";
 import { use, useEffect, useState } from "react";
+import { ProjectorItemView } from "@/components/projector/shared-item";
 
 interface Item {
   id: string; label: string; kind: string; stageTitle: string;
@@ -28,45 +29,27 @@ export default function PresentPage({ params }: { params: Promise<{ token: strin
   }, [token]);
 
   return (
-    <main id="main" className="min-h-screen bg-gradient-to-br from-[#0b1437] via-[#1e1b6e] to-[#3b0f7a] px-8 py-8 text-white">
-      {err && <p role="status" className="mb-6 rounded-lg bg-amber-200 p-4 text-xl font-semibold text-slate-950">{err}</p>}
+    <main id="main" className="min-h-screen bg-[#0c1a20] px-[4vw] py-[4vh] text-white" style={{ backgroundImage: "radial-gradient(1100px 600px at 85% -10%, rgba(29,92,99,0.55), transparent 60%), radial-gradient(900px 500px at -10% 110%, rgba(184,105,43,0.22), transparent 60%)" }}>
+      {err && <p role="status" className="mb-6 rounded-xl bg-amber-200 p-4 text-xl font-semibold text-slate-950">{err}</p>}
       {d && (
         <>
-          <h1 className="mb-8 text-5xl font-bold">{d.title}</h1>
+          <h1 className="mb-[4vh] font-display text-[clamp(2rem,4vw,4rem)] font-semibold">{d.title}</h1>
           {d.questions.length > 0 && (
-            <section aria-label="Discussion questions" className="mb-10 rounded-2xl border border-white/20 bg-[#312e81] p-8">
-              <h2 className="mb-4 text-3xl font-bold">Let's discuss</h2>
-              <ul className="space-y-4 text-4xl leading-snug">{d.questions.map((q) => <li key={q.id}>{q.text}</li>)}</ul>
+            <section aria-label="Discussion questions" className="mb-[4vh] rounded-3xl bg-white/[0.07] p-[2.4vw] ring-1 ring-white/10">
+              <h2 className="mb-4 text-[clamp(1rem,1.3vw,1.3rem)] font-semibold uppercase tracking-[0.2em] text-[#9fd0cb]">Let's discuss</h2>
+              <ul className="space-y-4 text-[clamp(1.6rem,3vw,3rem)] leading-tight">{d.questions.map((q) => <li key={q.id}>{q.text}</li>)}</ul>
             </section>
           )}
           {d.summaries.length > 0 && (
-            <section aria-label="Summaries" className="mb-10 space-y-4">
-              {d.summaries.map((s) => <div key={s.id} className="rounded-2xl border border-white/20 bg-[#581c87] p-8"><h2 className="mb-2 text-3xl font-bold">{s.label}</h2><p className="whitespace-pre-wrap text-3xl leading-snug">{s.text}</p></div>)}
+            <section aria-label="Summaries" className="mb-[4vh] space-y-4">
+              {d.summaries.map((s) => <div key={s.id} className="rounded-3xl bg-white/[0.07] p-[2.4vw] ring-1 ring-white/10"><h2 className="mb-2 font-display text-[clamp(1.4rem,2.2vw,2.3rem)] font-semibold text-[#f3d2b3]">{s.label}</h2><p className="whitespace-pre-wrap text-[clamp(1.1rem,1.7vw,1.8rem)] leading-snug">{s.text}</p></div>)}
             </section>
           )}
-          {d.items.length === 0 && d.summaries.length === 0 && d.questions.length === 0 ? <p className="text-4xl text-slate-300">Waiting for the facilitator to share something…</p> : (
-            <ul className="grid gap-6 lg:grid-cols-2">
+          {d.items.length === 0 && d.summaries.length === 0 && d.questions.length === 0 ? <p className="text-[clamp(1.6rem,3vw,3rem)] text-white/55">Waiting for the facilitator to share something…</p> : (
+            <ul className="grid gap-[2vw] lg:grid-cols-2">
               {d.items.map((it) => (
-                <li key={it.id} className="rounded-2xl border border-white/15 bg-white/10 p-8">
-                  <h2 className="mb-1 text-3xl font-bold text-amber-300">{it.label}</h2>
-                  <p className="mb-4 text-xl text-slate-300">{it.stageTitle}</p>
-                  {it.entries.map((e, i) => (
-                    <div key={i} className="mb-4">
-                      {e.questionText && <p className="mb-1 text-2xl font-semibold text-sky-300">{e.questionText}</p>}
-                      {e.body && <p className="whitespace-pre-wrap break-words text-3xl leading-snug">{e.body}</p>}
-                      {e.table && (
-                        <table className="mt-3 min-w-full border-collapse text-2xl">
-                          <thead><tr>{e.table.columns.map((c, ci) => <th key={ci} scope="col" className="border border-slate-500 bg-white/15 p-3 text-left">{c}</th>)}</tr></thead>
-                          <tbody>{e.table.rows.map((r, ri) => <tr key={ri}>{r.map((c, ci) => <td key={ci} className="border border-slate-500 p-3">{c}</td>)}</tr>)}</tbody>
-                        </table>
-                      )}
-                      {e.attachmentId && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={`/api/present/${encodeURIComponent(token)}/attachments/${e.attachmentId}`} alt="Shared picture" className="mt-3 max-h-96 max-w-full rounded-lg" />
-                      )}
-                    </div>
-                  ))}
-                  {it.synthesis && <p className="mt-3 rounded-xl bg-white/15 p-4 text-2xl"><strong>Group response:</strong> {it.synthesis}</p>}
+                <li key={it.id} className="rounded-3xl bg-white/[0.06] p-[2.4vw] ring-1 ring-white/10">
+                  <ProjectorItemView it={it} size="md" imageSrc={(a) => `/api/present/${encodeURIComponent(token)}/attachments/${a}`} />
                 </li>
               ))}
             </ul>

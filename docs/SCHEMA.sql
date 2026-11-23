@@ -177,7 +177,7 @@ CREATE TABLE participants(
   last_seen INTEGER NOT NULL,
   created_at INTEGER NOT NULL,
   removed_at INTEGER
-);
+, recovery_enc TEXT);
 
 CREATE TABLE peer_comments(
   id TEXT PRIMARY KEY,
@@ -291,7 +291,7 @@ CREATE TABLE stage_questions(
   position INTEGER NOT NULL,
   text TEXT NOT NULL,
   required INTEGER NOT NULL DEFAULT 0
-, deleted_at INTEGER);
+, deleted_at INTEGER, visible INTEGER NOT NULL DEFAULT 1);
 
 CREATE TABLE stage_resources(
   id TEXT PRIMARY KEY,

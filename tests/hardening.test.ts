@@ -32,7 +32,7 @@ describe("every endpoint is protected on the server", () => {
   // logout and leave are harmless without a sign-in (they only clear a cookie)
   const PUBLIC = new Set(["POST /auth/logout", "POST /leave", "GET /health", "POST /auth/login", "GET /public/session", "POST /join", "POST /recover", "GET /present/:token", "GET /present/:token/attachments/:id"]);
   const PARTICIPANT = new Set([
-    "GET /me", "POST /me/recovery-code", "POST /leave", "GET /board", "GET /stages/:sid", "GET /stages/:sid/entries", "POST /stages/:sid/entries", "PATCH /entries/:id", "DELETE /entries/:id",
+    "GET /me", "GET /me/recovery-code", "POST /me/recovery-code", "POST /leave", "GET /board", "GET /stages/:sid", "GET /stages/:sid/entries", "POST /stages/:sid/entries", "PATCH /entries/:id", "DELETE /entries/:id",
     "PUT /stages/:sid/synthesis", "POST /stages/:sid/uploads", "POST /stages/:sid/presence", "GET /stages/:sid/submission", "POST /stages/:sid/submit", "POST /reactions", "POST /comments", "DELETE /comments/:id", "GET /attachments/:id",
   ]);
   const fill = (p: string) => p.replace(/:[a-zA-Z]+/g, "x");

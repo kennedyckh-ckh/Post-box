@@ -6,6 +6,7 @@ export interface Entry {
 export interface StageDetail {
   stage: { id: string; title: string; instructions: string; tags: string[]; contributionTypes: string[]; availability: "open" | "closed"; canWrite: boolean; blockedReason: { code: string; message: string } | null };
   questions: { id: string; text: string; required: boolean }[];
+  hiddenQuestions: number;
   resources: { id: string; kind: "link" | "file"; title: string; url: string | null; attachmentId: string | null; mime: string | null }[];
   reference: { stageId: string; title: string; source: "draft" | "submitted"; entries: Entry[]; synthesis: string | null }[];
   synthesis: { body: string; version: number };

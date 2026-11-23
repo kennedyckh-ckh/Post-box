@@ -33,7 +33,7 @@ export default function NoticePage() {
         <p>Your work is kept until your facilitator deletes the session. Deleting a session removes its records and uploaded files from the app. Copies in backups made earlier may remain until those backups expire. An archived session is only read-only, not deleted.</p>
 
         <h2 className={h}>Getting back in, and leaving</h2>
-        <p>You are shown a private recovery code when you join. It is the only way to return from another device without help. If you lose it, ask your facilitator. If a facilitator removes you from a session, you lose access but your earlier contributions stay with your group's record.</p>
+        <p>You have a private recovery code. You do not need to note it when you join: open “Your recovery code” on your session page at any time while you are signed in. It is the only way to return from another device without help. It is stored encrypted, and only your own signed-in device can display it. Facilitators cannot look it up; they can only issue you a new one. If you lose it, ask your facilitator. If a facilitator removes you from a session, you lose access but your earlier contributions stay with your group's record.</p>
 
         <h2 className={h}>What this notice is not</h2>
         <p>It explains how this app works. It has not been checked against any law or institutional policy, and your organisation may need to add its own notice.</p>

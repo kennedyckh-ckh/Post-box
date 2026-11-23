@@ -52,13 +52,17 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
 
   return (
     <Shell wide right={<SignOutButton />}>
-      <p className="mb-3"><Link href="/facilitator" className="underline">← Your sessions</Link></p>
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+      <p className="mb-4 text-sm"><Link href="/facilitator" className="font-semibold text-muted hover:text-brand-strong">← Your sessions</Link></p>
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-brand-strong">{s.title}</h1>
-          <p className="mt-1"><Badge tone={s.status === "live" ? "green" : archived ? "gray" : "amber"}>{s.status === "setup" ? "Setting up (not started)" : s.status === "live" ? "Live" : "Archived (read-only)"}</Badge></p>
+          <h1 className="text-3xl text-ink sm:text-[2.2rem]">{s.title}</h1>
+          <p className="mt-2"><Badge tone={s.status === "live" ? "green" : archived ? "gray" : "amber"}>{s.status === "setup" ? "Setting up (not started)" : s.status === "live" ? "Live" : "Archived (read-only)"}</Badge></p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <a href={`/facilitator/sessions/${id}/projector`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#9a5622]">
+            <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" /></svg>
+            Projector view <span className="sr-only">(opens in a new window)</span>
+          </a>
           {s.status === "setup" && <Button onClick={() => { if (confirm("Start the session? Part 1 opens for participants. Later parts stay locked until you open them.")) void act(() => api("POST", `/sessions/${id}/start`, {}), "Session started. The first enabled part is open."); }}>Start session</Button>}
           <Button variant="secondary" onClick={() => { if (confirm("Make a clean copy of this session? It copies the setup, parts, questions, links, files and groups. It does not copy participants, work, PINs or the join code.")) void act(async () => { const r = await api<{ id: string; groupsNeedingPin: string[] }>("POST", `/sessions/${id}/duplicate`, {}); alert(`Copy created with a new join code.${r.groupsNeedingPin.length ? `\nSet new PINs for: ${r.groupsNeedingPin.join(", ")}` : ""}`); window.location.href = `/facilitator/sessions/${r.id}`; }); }}>Duplicate</Button>
           {!archived && <Button variant="secondary" onClick={() => { if (confirm("Archive this session? It becomes read-only and closed to joining and new contributions. You can restore it later.")) void act(() => api("POST", `/sessions/${id}/archive`, {}), "Session archived."); }}>Archive</Button>}
@@ -69,12 +73,12 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
       {error && <Alert kind="error">{error}</Alert>}
       {notice && <Alert kind="success">{notice}</Alert>}
 
-      <Card className="mb-6" label="Joining">
+      <Card className="mb-8" label="Joining">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="text-sm font-semibold">Join code</p>
-            <p className="font-mono text-4xl font-bold tracking-widest" aria-label={`Join code ${s.joinCode.split("").join(" ")}`}>{s.joinCode}</p>
-            <p className="mt-1 text-sm">Joining is <strong>{s.joiningOpen ? "open" : "closed"}</strong>{s.status === "setup" && !s.earlyJoin ? " (and participants cannot join until you start the session)" : ""}.</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">Join code</p>
+            <p className="mt-1 font-mono text-4xl font-bold tracking-[0.18em] text-ink" aria-label={`Join code ${s.joinCode.split("").join(" ")}`}>{s.joinCode}</p>
+            <p className="mt-1 text-sm text-muted">Joining is <strong>{s.joiningOpen ? "open" : "closed"}</strong>{s.status === "setup" && !s.earlyJoin ? " (and participants cannot join until you start the session)" : ""}.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" disabled={archived} onClick={() => void act(() => api("POST", `/sessions/${id}/joining`, { open: !s.joiningOpen }), s.joiningOpen ? "Joining closed. Existing participants keep their access." : "Joining opened.")}>{s.joiningOpen ? "Close joining" : "Open joining"}</Button>
@@ -83,9 +87,9 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
         </div>
       </Card>
 
-      <div role="tablist" aria-label="Session sections" className="mb-4 flex flex-wrap gap-2">
+      <div role="tablist" aria-label="Session sections" className="mb-6 flex flex-wrap gap-1 border-b border-line">
         {TABS.map((t) => (
-          <button key={t.key} role="tab" id={`tab-${t.key}`} aria-selected={tab === t.key} aria-controls={`panel-${t.key}`} onClick={() => setTab(t.key)} className={`min-h-11 rounded-lg px-4 font-semibold transition ${tab === t.key ? "bg-accent text-white shadow-sm" : "border border-brand bg-white text-brand-strong hover:bg-blue-50"}`}>{t.label}</button>
+          <button key={t.key} role="tab" id={`tab-${t.key}`} aria-selected={tab === t.key} aria-controls={`panel-${t.key}`} onClick={() => setTab(t.key)} className={`-mb-px min-h-11 border-b-2 px-3.5 text-sm font-semibold transition ${tab === t.key ? "border-brand-strong text-ink" : "border-transparent text-muted hover:border-line-strong hover:text-ink"}`}>{t.label}</button>
         ))}
       </div>
       <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
