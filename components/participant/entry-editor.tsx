@@ -140,12 +140,12 @@ export function EntryEditor({ detail, editing, onDone, onState }: Props) {
 }
 
 /** "1", "1a", "1b", "2" … in the order participants see them. */
-function questionOptions(qs: { id: string; text: string; parentId: string | null }[]) {
+function questionOptions(qs: { id: string; heading?: string; text: string; parentId: string | null }[]) {
   const out: { id: string; text: string; label: string }[] = [];
   let n = 0;
   for (const q of qs.filter((x) => !x.parentId)) {
     n++;
-    out.push({ id: q.id, text: q.text, label: String(n) });
+    out.push({ id: q.id, text: q.heading ? `${q.heading}: ${q.text}` : q.text, label: String(n) });
     qs.filter((x) => x.parentId === q.id).forEach((sq, k) => out.push({ id: sq.id, text: sq.text, label: `${n}${String.fromCharCode(97 + k)}` }));
   }
   return out;

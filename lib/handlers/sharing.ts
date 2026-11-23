@@ -282,7 +282,7 @@ route("GET", "/sessions/:id/projector", (ctx) => {
     });
     return {
       id: str(stg.id), position: num(stg.position), title: str(stg.title), visible: !!num(stg.visible), availability: str(stg.availability), instructions: str(stg.instructions),
-      questions: qs.filter((q) => q.visible).map((q) => ({ id: q.id, text: q.text, required: q.required, parentId: q.parentId })),
+      questions: qs.filter((q) => q.visible).map((q) => ({ id: q.id, heading: q.heading, text: q.text, required: q.required, parentId: q.parentId })),
       hiddenQuestions: qs.filter((q) => !q.visible && !q.parentId).length,
       expected: expected.size, submitted: perGroup.filter((x) => x.expected && x.status === "submitted").length, perGroup,
     };

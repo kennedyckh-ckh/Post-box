@@ -52,7 +52,7 @@ function build(s: Row, identified: boolean) {
   const facilitatorContent = {
     stages: stages.map((st) => ({
       id: st.id, position: num(st.position), title: st.title, enabled: !!num(st.enabled), instructions: st.instructions, tags: parseJson<string[]>(st.tags_json, []),
-      questions: allQuestions(str(st.id)).map((q) => ({ id: q.id, text: q.text, required: q.required, parentId: q.parentId, visibleToParticipants: q.visible })),
+      questions: allQuestions(str(st.id)).map((q) => ({ id: q.id, heading: q.heading, text: q.text, required: q.required, parentId: q.parentId, visibleToParticipants: q.visible })),
       resources: all("SELECT kind,title,url,attachment_id FROM stage_resources WHERE stage_id=? ORDER BY position", str(st.id)).map((r) => ({ kind: r.kind, title: r.title, url: r.url ?? null, attachmentId: r.attachment_id ?? null })),
     })),
     shared: pubs.map((x) => ({

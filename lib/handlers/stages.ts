@@ -136,7 +136,10 @@ route("POST", "/stages/:sid/questions", (ctx) => {
   }
   // visible defaults to true; send visible:false to keep the question hidden until you reveal it. Sub-questions follow their main question.
   const visible = parentId ? true : b.visible === undefined ? true : bool(b.visible, "visible");
-  run("INSERT INTO stage_questions(id,stage_id,position,text,required,visible,parent_id) VALUES(?,?,?,?,?,?,?)", id, str(stage.id), pos, t, b.required === true ? 1 : 0, visible ? 1 : 0, parentId);
+  // Optional heading, for main questions only.
+  const heading = parentId ? "" : text(b.heading, "Heading", { max: 120, optional: true }).trim();
+  if (parentId && typeof b.heading === "string" && b.heading.trim()) throw badRequest("Headings are for main questions only.");
+  run("INSERT INTO stage_questions(id,stage_id,position,text,required,visible,parent_id,heading) VALUES(?,?,?,?,?,?,?,?)", id, str(stage.id), pos, t, b.required === true ? 1 : 0, visible ? 1 : 0, parentId, heading);
   audit("facilitator", u.id, "question_added", { sessionId: str(session.id), target: id });
   return { id };
 });
@@ -157,6 +160,11 @@ route("PATCH", "/questions/:qid", (ctx) => {
   const vals: unknown[] = [];
   if (b.text !== undefined) { sets.push("text=?"); vals.push(text(b.text, "Question", { max: 500 })); }
   if (b.required !== undefined) { sets.push("required=?"); vals.push(bool(b.required, "required") ? 1 : 0); }
+  if (b.heading !== undefined) {
+    const h = text(b.heading, "Heading", { max: 120, optional: true }).trim();
+    if (q.parent_id && h) throw badRequest("Headings are for main questions only.");
+    sets.push("heading=?"); vals.push(h);
+  }
   let visibility: boolean | undefined;
   if (b.visible !== undefined) {
     if (q.parent_id) throw badRequest("A sub-question is shown together with its main question. Reveal or hide the main question instead.");

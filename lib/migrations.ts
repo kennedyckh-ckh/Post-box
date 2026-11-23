@@ -451,4 +451,11 @@ CREATE TABLE session_timers(
 );
 `,
   },
+  {
+    id: "008_question_heading",
+    sql: `
+-- An optional short heading shown above a main guiding question (for example "Making a prediction").
+ALTER TABLE stage_questions ADD COLUMN heading TEXT NOT NULL DEFAULT '';
+`,
+  },
 ];

@@ -122,3 +122,34 @@ describe("session timer", () => {
     expect((await fac.post(`/sessions/${s.id}/timer`, { action: "add", seconds: 60 })).body.timer.state).toBe("running");
   });
 });
+
+describe("editing guiding questions and optional headings", () => {
+  it("edits question and sub-question wording, sets and clears a heading, and participants see the change", async () => {
+    const { fac, s } = await liveSession();
+    const stage = s.stages[0].id;
+    const main = (await fac.post(`/stages/${stage}/questions`, { text: "Old wording", heading: "Making a prediction" })).body.id;
+    const sub = (await fac.post(`/stages/${stage}/questions`, { text: "Old sub", parentId: main })).body.id;
+    expect((await fac.post(`/stages/${stage}/questions`, { text: "Sub with heading", parentId: main, heading: "No" })).status).toBe(400);
+    const p = await joinAs(s, "Eve");
+    const e1 = (await p.c.get(`/stages/${stage}/entries`)).body.etag;
+    let q = (await p.c.get(`/stages/${stage}`)).body.questions.find((x: { id: string }) => x.id === main);
+    expect(q).toMatchObject({ heading: "Making a prediction", text: "Old wording" });
+    expect((await fac.patch(`/questions/${main}`, { text: "New wording", heading: "Testing the idea" })).status).toBe(200);
+    expect((await fac.patch(`/questions/${sub}`, { text: "New sub" })).status).toBe(200);
+    expect((await fac.patch(`/questions/${sub}`, { heading: "Not allowed" })).status).toBe(400);
+    expect((await fac.patch(`/questions/${main}`, { text: "" })).status).toBe(400);
+    // the open participant page notices the edit on its next poll
+    expect((await p.c.get(`/stages/${stage}/entries?etag=${e1}`)).body.unchanged).toBeUndefined();
+    const qs = (await p.c.get(`/stages/${stage}`)).body.questions;
+    q = qs.find((x: { id: string }) => x.id === main);
+    expect(q).toMatchObject({ heading: "Testing the idea", text: "New wording" });
+    expect(qs.find((x: { id: string }) => x.id === sub).text).toBe("New sub");
+    await fac.patch(`/questions/${main}`, { heading: "" });
+    expect((await fac.get(`/sessions/${s.id}/stages`)).body.stages[0].questions.find((x: { id: string }) => x.id === main).heading).toBe("");
+    // headings are copied with the session
+    await fac.patch(`/questions/${main}`, { heading: "Copied heading" });
+    const copy = (await fac.post(`/sessions/${s.id}/duplicate`)).body.id;
+    expect((await fac.get(`/sessions/${copy}/stages`)).body.stages[0].questions.some((x: { heading: string }) => x.heading === "Copied heading")).toBe(true);
+    expect((await p.c.patch(`/questions/${main}`, { text: "hack" })).status).toBe(401);
+  });
+});

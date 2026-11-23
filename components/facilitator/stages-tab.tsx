@@ -8,7 +8,7 @@ import type { Detail, Act } from "./types";
 interface StageFull {
   id: string; position: number; title: string; enabled: boolean; visible: boolean; availability: "locked" | "open" | "closed"; instructions: string;
   tags: string[]; contributionTypes: string[]; referenceStageIds: string[]; entryCount: number;
-  questions: { id: string; text: string; required: boolean; visible: boolean; parentId: string | null }[];
+  questions: { id: string; heading: string; text: string; required: boolean; visible: boolean; parentId: string | null }[];
   resources: { id: string; kind: "link" | "file"; title: string; url: string | null; mime: string | null }[];
 }
 interface GS { groupId: string; stageId: string; availabilityOverride: "locked" | "open" | "closed" | null; excluded: boolean }
@@ -34,6 +34,23 @@ function StageCard({ st, all, d, gs, act, reload }: { st: StageFull; all: StageF
   const [subFor, setSubFor] = useState<string | null>(null);
   const [subText, setSubText] = useState("");
   const [subReq, setSubReq] = useState(false);
+  const [qHeading, setQHeading] = useState("");
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
+  const [editHeading, setEditHeading] = useState("");
+  const startEdit = (q: { id: string; text: string; heading: string }) => { setEditId(q.id); setEditText(q.text); setEditHeading(q.heading); };
+  const saveEdit = (q: { id: string; parentId: string | null }, label: string) => void run(async () => {
+    await api("PATCH", `/questions/${q.id}`, q.parentId ? { text: editText } : { text: editText, heading: editHeading });
+    setEditId(null);
+  }, `Question ${label} updated.`);
+  const editForm = (q: { id: string; parentId: string | null }, label: string) => (
+    <form className="mt-2 flex-1 basis-full rounded-lg border border-brand/40 bg-brand-soft/40 p-3" onSubmit={(e) => { e.preventDefault(); if (editText.trim()) saveEdit(q, label); }}>
+      {!q.parentId && <TextField label={`Heading for question ${label} (optional)`} value={editHeading} onChange={setEditHeading} maxLength={120} hint="A short title shown above the question, e.g. “Making a prediction”. Leave empty for none." />}
+      <Field label={`${q.parentId ? "Sub-question" : "Question"} ${label}`}>{(id) => <textarea id={id} className={`${inputCls} min-h-20`} maxLength={500} value={editText} onChange={(e) => setEditText(e.target.value)} required />}</Field>
+      <div className="flex flex-wrap gap-2"><Button type="submit" disabled={archived || !editText.trim()}>Save changes</Button><Button variant="ghost" onClick={() => setEditId(null)}>Cancel</Button></div>
+      <p className="mt-2 text-sm text-muted">Entries already written stay linked to this question and will show the new wording.</p>
+    </form>
+  );
   const run: Act = async (fn, ok) => { await act(fn, ok); reload(); };
   const setAvail = (a: string, confirmText: string) => {
     if (!confirm(confirmText)) return;
@@ -107,12 +124,17 @@ function StageCard({ st, all, d, gs, act, reload }: { st: StageFull; all: StageF
                 <li key={qq.id} className={`rounded-lg border p-3 ${qq.visible ? "border-line bg-surface" : "border-dashed border-line-strong bg-transparent"}`}>
                   <div className="flex flex-wrap items-center gap-3">
                     <span aria-hidden="true" className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${qq.visible ? "bg-brand-strong text-white" : "bg-[#eeebe4] text-muted"}`}>{i + 1}</span>
-                    <span className={`min-w-48 flex-1 ${qq.visible ? "text-ink" : "text-muted"}`}>{qq.text}</span>
+                    <span className={`min-w-48 flex-1 ${qq.visible ? "text-ink" : "text-muted"}`}>
+                      {qq.heading && <span className="block text-xs font-semibold uppercase tracking-[0.12em] text-accent">{qq.heading}</span>}
+                      {qq.text}
+                    </span>
                     <Badge tone={qq.visible ? "green" : "gray"}>{qq.visible ? "Shown" : "Hidden"}</Badge>
                     <Button variant={qq.visible ? "secondary" : "primary"} disabled={archived} aria-label={`${qq.visible ? "Hide" : "Reveal"} question ${i + 1}`} onClick={() => void run(() => api("PATCH", `/questions/${qq.id}`, { visible: !qq.visible }), qq.visible ? `Question ${i + 1} hidden from participants.` : `Question ${i + 1} revealed to participants.`)}>{qq.visible ? "Hide" : "Reveal"}</Button>
                     <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" className="h-5 w-5" checked={qq.required} disabled={archived} onChange={(e) => void run(() => api("PATCH", `/questions/${qq.id}`, { required: e.target.checked }))} /> Required</label>
+                    <Button variant="ghost" disabled={archived} aria-label={`Edit question ${i + 1}`} onClick={() => startEdit(qq)}>Edit</Button>
                     <Button variant="ghost" disabled={archived} onClick={() => { if (confirm(subs.length ? `Remove this question and its ${subs.length} sub-question${subs.length === 1 ? "" : "s"}? Earlier entries keep their link.` : "Remove this question? Earlier entries keep their link to it.")) void run(() => api("DELETE", `/questions/${qq.id}`)); }}>Remove</Button>
                   </div>
+                  {editId === qq.id && editForm(qq, String(i + 1))}
                   {subs.length > 0 && (
                     <ol className="ml-10 mt-2 space-y-1.5 border-l-2 border-line pl-4" aria-label={`Sub-questions of question ${i + 1}`}>
                       {subs.map((sq, k) => (
@@ -120,7 +142,9 @@ function StageCard({ st, all, d, gs, act, reload }: { st: StageFull; all: StageF
                           <span className="w-7 shrink-0 text-sm font-semibold text-muted">{i + 1}{String.fromCharCode(97 + k)}</span>
                           <span className={`min-w-40 flex-1 text-sm ${qq.visible ? "text-ink" : "text-muted"}`}>{sq.text}</span>
                           <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" className="h-5 w-5" checked={sq.required} disabled={archived} onChange={(e) => void run(() => api("PATCH", `/questions/${sq.id}`, { required: e.target.checked }))} /> Required</label>
+                          <Button variant="ghost" disabled={archived} aria-label={`Edit sub-question ${i + 1}${String.fromCharCode(97 + k)}`} onClick={() => startEdit(sq)}>Edit</Button>
                           <Button variant="ghost" disabled={archived} aria-label={`Remove sub-question ${i + 1}${String.fromCharCode(97 + k)}`} onClick={() => { if (confirm("Remove this sub-question? Earlier entries keep their link to it.")) void run(() => api("DELETE", `/questions/${sq.id}`)); }}>Remove</Button>
+                          {editId === sq.id && editForm(sq, `${i + 1}${String.fromCharCode(97 + k)}`)}
                         </li>
                       ))}
                     </ol>
@@ -139,10 +163,11 @@ function StageCard({ st, all, d, gs, act, reload }: { st: StageFull; all: StageF
             })}
           </ol>
           <div className="flex flex-wrap items-end gap-x-4 gap-y-1">
+            <div className="basis-full"><TextField label="Heading for the new question (optional)" value={qHeading} onChange={setQHeading} maxLength={120} /></div>
             <div className="min-w-64 flex-1"><TextField label="New main question" value={q} onChange={setQ} maxLength={500} /></div>
             <label className="mb-4 flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" className="h-5 w-5" checked={qHidden} onChange={(e) => setQHidden(e.target.checked)} /> Keep hidden until I reveal it</label>
             <label className="mb-4 flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" className="h-5 w-5" checked={qReq} onChange={(e) => setQReq(e.target.checked)} /> Required</label>
-            <div className="mb-4"><Button disabled={archived || !q.trim()} onClick={() => void run(async () => { await api("POST", `/stages/${st.id}/questions`, { text: q, required: qReq, visible: !qHidden }); setQ(""); setQReq(false); }, qHidden ? "Question added (hidden until you reveal it)." : "Question added and shown to participants.")}>Add question</Button></div>
+            <div className="mb-4"><Button disabled={archived || !q.trim()} onClick={() => void run(async () => { await api("POST", `/stages/${st.id}/questions`, { text: q, heading: qHeading, required: qReq, visible: !qHidden }); setQ(""); setQHeading(""); setQReq(false); }, qHidden ? "Question added (hidden until you reveal it)." : "Question added and shown to participants.")}>Add question</Button></div>
           </div>
           <p className="text-sm text-muted">Sub-questions are optional and appear together with their main question. Required questions only count once they are shown. You can also reveal questions from the projector view.</p>
         </div>
