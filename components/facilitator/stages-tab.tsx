@@ -8,9 +8,75 @@ import type { Detail, Act } from "./types";
 interface StageFull {
   id: string; position: number; title: string; enabled: boolean; visible: boolean; availability: "locked" | "open" | "closed"; instructions: string;
   tags: string[]; contributionTypes: string[]; referenceStageIds: string[]; entryCount: number;
-  questions: { id: string; heading: string; text: string; required: boolean; visible: boolean; parentId: string | null }[];
+  questions: { id: string; heading: string; text: string; required: boolean; visible: boolean; parentId: string | null; options: string[] }[];
+  tallies: Tally[];
   resources: { id: string; kind: "link" | "file"; title: string; url: string | null; mime: string | null }[];
 }
+interface Tally { questionId: string; options: { label: string; count: number }[]; other: number; total: number; byGroup: { groupId: string; counts: Record<string, number>; total: number }[] }
+
+const PRESETS: { label: string; options: string[] }[] = [
+  { label: "Agree / Disagree", options: ["Agree", "Disagree"] },
+  { label: "Agree / Not sure / Disagree", options: ["Agree", "Not sure", "Disagree"] },
+  { label: "True / False", options: ["True", "False"] },
+  { label: "Confirmed / Changed my thinking", options: ["Confirmed my thinking", "Changed my thinking"] },
+];
+const parseOpts = (t: string) => t.split(/[\n,]/).map((x) => x.trim()).filter(Boolean);
+
+/**
+ * How participants respond to one question: an open answer, or choose one of the facilitator's options
+ * (for example Agree / Disagree) and then write a reason. Options are typed one per line or separated by commas.
+ */
+function ResponseOptions({ value, onChange, idBase }: { value: string; onChange: (v: string) => void; idBase: string }) {
+  const choice = value !== "";
+  return (
+    <fieldset className="mb-3">
+      <legend className="mb-1 text-sm font-semibold">How participants respond</legend>
+      <div className="flex flex-wrap gap-x-5">
+        <label className="flex min-h-11 items-center gap-2 text-sm"><input type="radio" name={`${idBase}-rt`} checked={!choice} onChange={() => onChange("")} /> Open answer</label>
+        <label className="flex min-h-11 items-center gap-2 text-sm"><input type="radio" name={`${idBase}-rt`} checked={choice} onChange={() => onChange(value || "Agree, Disagree")} /> Choose an option, then give a reason</label>
+      </div>
+      {choice && (
+        <div className="mt-1 rounded-lg border border-line bg-white p-3">
+          <div className="mb-2 flex flex-wrap gap-2">
+            {PRESETS.map((p) => <button key={p.label} type="button" onClick={() => onChange(p.options.join(", "))} className={`min-h-9 rounded-full border px-3 text-sm font-semibold transition ${parseOpts(value).join("|") === p.options.join("|") ? "border-brand-strong bg-brand-strong text-white" : "border-line text-ink hover:border-brand"}`}>{p.label}</button>)}
+          </div>
+          <TextField label="Options (2 to 6, separated by commas)" value={value} onChange={onChange} maxLength={260} hint="For example: Agree, Disagree. The class results count how many people chose each option." />
+        </div>
+      )}
+    </fieldset>
+  );
+}
+
+/** Exact counts for one question with options, with a bar for each option. Counts are people, one answer each. */
+function TallyBars({ t, groups }: { t: Tally; groups: { id: string; name: string }[] }) {
+  return (
+    <div className="mt-2 rounded-lg bg-surface-2 p-3 text-sm">
+      <p className="mb-1.5 font-semibold text-ink">Class results: {t.total} {t.total === 1 ? "response" : "responses"}</p>
+      <ul className="space-y-1">
+        {t.options.map((o) => (
+          <li key={o.label} className="flex items-center gap-2">
+            <span className="w-40 shrink-0 truncate">{o.label}</span>
+            <span className="h-2.5 flex-1 overflow-hidden rounded-full bg-[#eeebe4]"><span className="block h-full rounded-full bg-brand" style={{ width: `${t.total ? (o.count / t.total) * 100 : 0}%` }} /></span>
+            <span className="w-24 shrink-0 text-right tabular-nums"><strong>{o.count}</strong>{t.total ? ` (${Math.round((o.count / t.total) * 100)}%)` : ""}</span>
+          </li>
+        ))}
+        {t.other > 0 && <li className="text-muted">{t.other} earlier {t.other === 1 ? "answer uses an option" : "answers use options"} you have since renamed or removed.</li>}
+      </ul>
+      {t.byGroup.length > 0 && (
+        <details className="mt-2">
+          <summary className="cursor-pointer font-semibold text-brand-strong">By group</summary>
+          <ul className="mt-1 space-y-0.5">
+            {groups.filter((g) => t.byGroup.some((b) => b.groupId === g.id)).map((g) => {
+              const b = t.byGroup.find((x) => x.groupId === g.id)!;
+              return <li key={g.id}><strong>{g.name}:</strong> {t.options.map((o) => `${o.label} ${b.counts[o.label] ?? 0}`).join(" · ")}{b.counts.__other ? ` · other ${b.counts.__other}` : ""}</li>;
+            })}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
+}
+
 interface GS { groupId: string; stageId: string; availabilityOverride: "locked" | "open" | "closed" | null; excluded: boolean }
 
 function StageCard({ st, all, d, gs, act, reload }: { st: StageFull; all: StageFull[]; d: Detail; gs: GS[]; act: Act; reload: () => void }) {
@@ -35,20 +101,23 @@ function StageCard({ st, all, d, gs, act, reload }: { st: StageFull; all: StageF
   const [subText, setSubText] = useState("");
   const [subReq, setSubReq] = useState(false);
   const [qHeading, setQHeading] = useState("");
+  const [qOpts, setQOpts] = useState("");
+  const [editOpts, setEditOpts] = useState("");
   const [editId, setEditId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
   const [editHeading, setEditHeading] = useState("");
-  const startEdit = (q: { id: string; text: string; heading: string }) => { setEditId(q.id); setEditText(q.text); setEditHeading(q.heading); };
+  const startEdit = (q: { id: string; text: string; heading: string; options: string[] }) => { setEditId(q.id); setEditText(q.text); setEditHeading(q.heading); setEditOpts(q.options.join(", ")); };
   const saveEdit = (q: { id: string; parentId: string | null }, label: string) => void run(async () => {
-    await api("PATCH", `/questions/${q.id}`, q.parentId ? { text: editText } : { text: editText, heading: editHeading });
+    await api("PATCH", `/questions/${q.id}`, q.parentId ? { text: editText, options: parseOpts(editOpts) } : { text: editText, heading: editHeading, options: parseOpts(editOpts) });
     setEditId(null);
   }, `Question ${label} updated.`);
-  const editForm = (q: { id: string; parentId: string | null }, label: string) => (
+  const editForm = (q: { id: string; parentId: string | null; options: string[] }, label: string) => (
     <form className="mt-2 flex-1 basis-full rounded-lg border border-brand/40 bg-brand-soft/40 p-3" onSubmit={(e) => { e.preventDefault(); if (editText.trim()) saveEdit(q, label); }}>
       {!q.parentId && <TextField label={`Heading for question ${label} (optional)`} value={editHeading} onChange={setEditHeading} maxLength={120} hint="A short title shown above the question, e.g. “Making a prediction”. Leave empty for none." />}
       <Field label={`${q.parentId ? "Sub-question" : "Question"} ${label}`}>{(id) => <textarea id={id} className={`${inputCls} min-h-20`} maxLength={500} value={editText} onChange={(e) => setEditText(e.target.value)} required />}</Field>
+      <ResponseOptions value={editOpts} onChange={setEditOpts} idBase={`e-${q.id}`} />
       <div className="flex flex-wrap gap-2"><Button type="submit" disabled={archived || !editText.trim()}>Save changes</Button><Button variant="ghost" onClick={() => setEditId(null)}>Cancel</Button></div>
-      <p className="mt-2 text-sm text-muted">Entries already written stay linked to this question and will show the new wording.</p>
+      <p className="mt-2 text-sm text-muted">Entries already written stay linked to this question and will show the new wording. If you rename options after people have answered, their earlier choices are counted separately until they change them.</p>
     </form>
   );
   const run: Act = async (fn, ok) => { await act(fn, ok); reload(); };
@@ -127,6 +196,7 @@ function StageCard({ st, all, d, gs, act, reload }: { st: StageFull; all: StageF
                     <span className={`min-w-48 flex-1 ${qq.visible ? "text-ink" : "text-muted"}`}>
                       {qq.heading && <span className="block text-xs font-semibold uppercase tracking-[0.12em] text-accent">{qq.heading}</span>}
                       {qq.text}
+                      {qq.options.length > 0 && <span className="mt-1 block"><Badge tone="blue">{qq.options.join(" / ")} + reason</Badge></span>}
                     </span>
                     <Badge tone={qq.visible ? "green" : "gray"}>{qq.visible ? "Shown" : "Hidden"}</Badge>
                     <Button variant={qq.visible ? "secondary" : "primary"} disabled={archived} aria-label={`${qq.visible ? "Hide" : "Reveal"} question ${i + 1}`} onClick={() => void run(() => api("PATCH", `/questions/${qq.id}`, { visible: !qq.visible }), qq.visible ? `Question ${i + 1} hidden from participants.` : `Question ${i + 1} revealed to participants.`)}>{qq.visible ? "Hide" : "Reveal"}</Button>
@@ -135,16 +205,18 @@ function StageCard({ st, all, d, gs, act, reload }: { st: StageFull; all: StageF
                     <Button variant="ghost" disabled={archived} onClick={() => { if (confirm(subs.length ? `Remove this question and its ${subs.length} sub-question${subs.length === 1 ? "" : "s"}? Earlier entries keep their link.` : "Remove this question? Earlier entries keep their link to it.")) void run(() => api("DELETE", `/questions/${qq.id}`)); }}>Remove</Button>
                   </div>
                   {editId === qq.id && editForm(qq, String(i + 1))}
+                  {qq.options.length > 0 && editId !== qq.id && ((t) => t && <TallyBars t={t} groups={d.groups} />)(st.tallies.find((t) => t.questionId === qq.id))}
                   {subs.length > 0 && (
                     <ol className="ml-10 mt-2 space-y-1.5 border-l-2 border-line pl-4" aria-label={`Sub-questions of question ${i + 1}`}>
                       {subs.map((sq, k) => (
                         <li key={sq.id} className="flex flex-wrap items-center gap-3">
                           <span className="w-7 shrink-0 text-sm font-semibold text-muted">{i + 1}{String.fromCharCode(97 + k)}</span>
-                          <span className={`min-w-40 flex-1 text-sm ${qq.visible ? "text-ink" : "text-muted"}`}>{sq.text}</span>
+                          <span className={`min-w-40 flex-1 text-sm ${qq.visible ? "text-ink" : "text-muted"}`}>{sq.text}{sq.options.length > 0 && <> <Badge tone="blue">{sq.options.join(" / ")} + reason</Badge></>}</span>
                           <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" className="h-5 w-5" checked={sq.required} disabled={archived} onChange={(e) => void run(() => api("PATCH", `/questions/${sq.id}`, { required: e.target.checked }))} /> Required</label>
                           <Button variant="ghost" disabled={archived} aria-label={`Edit sub-question ${i + 1}${String.fromCharCode(97 + k)}`} onClick={() => startEdit(sq)}>Edit</Button>
                           <Button variant="ghost" disabled={archived} aria-label={`Remove sub-question ${i + 1}${String.fromCharCode(97 + k)}`} onClick={() => { if (confirm("Remove this sub-question? Earlier entries keep their link to it.")) void run(() => api("DELETE", `/questions/${sq.id}`)); }}>Remove</Button>
                           {editId === sq.id && editForm(sq, `${i + 1}${String.fromCharCode(97 + k)}`)}
+                          {sq.options.length > 0 && editId !== sq.id && ((t) => t && <div className="basis-full"><TallyBars t={t} groups={d.groups} /></div>)(st.tallies.find((t) => t.questionId === sq.id))}
                         </li>
                       ))}
                     </ol>
@@ -165,9 +237,10 @@ function StageCard({ st, all, d, gs, act, reload }: { st: StageFull; all: StageF
           <div className="flex flex-wrap items-end gap-x-4 gap-y-1">
             <div className="basis-full"><TextField label="Heading for the new question (optional)" value={qHeading} onChange={setQHeading} maxLength={120} /></div>
             <div className="min-w-64 flex-1"><TextField label="New main question" value={q} onChange={setQ} maxLength={500} /></div>
+            <div className="basis-full"><ResponseOptions value={qOpts} onChange={setQOpts} idBase={`n-${st.id}`} /></div>
             <label className="mb-4 flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" className="h-5 w-5" checked={qHidden} onChange={(e) => setQHidden(e.target.checked)} /> Keep hidden until I reveal it</label>
             <label className="mb-4 flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" className="h-5 w-5" checked={qReq} onChange={(e) => setQReq(e.target.checked)} /> Required</label>
-            <div className="mb-4"><Button disabled={archived || !q.trim()} onClick={() => void run(async () => { await api("POST", `/stages/${st.id}/questions`, { text: q, heading: qHeading, required: qReq, visible: !qHidden }); setQ(""); setQHeading(""); setQReq(false); }, qHidden ? "Question added (hidden until you reveal it)." : "Question added and shown to participants.")}>Add question</Button></div>
+            <div className="mb-4"><Button disabled={archived || !q.trim()} onClick={() => void run(async () => { await api("POST", `/stages/${st.id}/questions`, { text: q, heading: qHeading, required: qReq, visible: !qHidden, options: parseOpts(qOpts) }); setQ(""); setQHeading(""); setQReq(false); setQOpts(""); }, qHidden ? "Question added (hidden until you reveal it)." : "Question added and shown to participants.")}>Add question</Button></div>
           </div>
           <p className="text-sm text-muted">Sub-questions are optional and appear together with their main question. Required questions only count once they are shown. You can also reveal questions from the projector view.</p>
         </div>
@@ -228,6 +301,13 @@ export function StagesTab({ d, act }: { d: Detail; act: Act }) {
   const [err, setErr] = useState("");
   const load = useCallback(() => api<{ stages: StageFull[]; groupSettings: GS[] }>("GET", `/sessions/${d.session.id}/stages`).then((r) => { setStages(r.stages); setGs(r.groupSettings); }).catch((e) => setErr(errText(e))), [d.session.id]);
   useEffect(() => { void load(); }, [load, d.stages]);
+  // Keep class results (Agree / Disagree counts and the like) current while the session is live.
+  const hasChoice = !!stages?.some((x) => x.questions.some((q) => q.options.length > 0));
+  useEffect(() => {
+    if (!hasChoice || d.session.status !== "live") return;
+    const t = setInterval(() => void load(), 6000);
+    return () => clearInterval(t);
+  }, [hasChoice, d.session.status, load]);
   if (err) return <Alert kind="error">{err}</Alert>;
   if (!stages) return <p role="status">Loading…</p>;
   return <ul className="grid grid-cols-[minmax(0,1fr)] gap-4">{stages.map((s) => <StageCard key={s.id + s.title + s.instructions + s.questions.length + s.resources.length + s.availability} st={s} all={stages} d={d} gs={gs} act={act} reload={load} />)}</ul>;

@@ -1,8 +1,9 @@
 export interface StageTemplate {
   title: string;
   instructions: string;
-  questions: { text: string; required: boolean }[];
+  questions: { text: string; required: boolean; heading?: string; options?: string[] }[];
   tags: string[];
+  contributionTypes?: string[];
 }
 export interface Template {
   key: string;
@@ -10,6 +11,8 @@ export interface Template {
   description: string;
   stages: StageTemplate[];
 }
+
+const AGREE = ["Agree", "Disagree"];
 
 const blankStage = (n: number): StageTemplate => ({ title: `Part ${n}`, instructions: "", questions: [], tags: [] });
 
@@ -64,6 +67,33 @@ export const TEMPLATES: Template[] = [
       { title: "Part 1: Goals", instructions: "Agree what the project must achieve.", questions: [{ text: "What are the goals and how will you know they are met?", required: true }], tags: ["Goal", "Measure"] },
       { title: "Part 2: Plan", instructions: "Break the work into tasks and risks.", questions: [{ text: "What tasks, resources and risks do you foresee?", required: true }], tags: ["Task", "Resource", "Risk"] },
       { title: "Part 3: Timeline", instructions: "Agree who does what, and by when.", questions: [{ text: "Who does what, and by when?", required: true }], tags: ["Milestone", "Owner"] },
+    ],
+  },
+  {
+    key: "post_box",
+    label: "Post-box",
+    description: "Judge statements (Agree or Disagree) with reasons, see the class results, reflect on each station, then reflect openly.",
+    stages: [
+      {
+        title: "Part 1: Post-box statements",
+        instructions: "Read each statement. Choose Agree or Disagree, then write your reason below. Answer on your own first: your group can see your answer, and the class sees only the totals when your facilitator shows them.",
+        questions: [1, 2, 3, 4].map((n) => ({ heading: `Statement ${n}`, text: `Edit this text to write statement ${n}.`, required: true, options: AGREE })),
+        tags: ["Evidence", "Example", "Experience", "Question"],
+        contributionTypes: ["text"],
+      },
+      {
+        title: "Part 2: Station reflections",
+        instructions: "Reflect on each station you visited. Use the prompt for each station, and refer to your group's reasons from Part 1 where it helps.",
+        questions: [1, 2, 3, 4].map((n) => ({ heading: `Station ${n}`, text: "What did you notice at this station, and how did it change or confirm your thinking?", required: false })),
+        tags: ["Noticing", "Changed my mind", "Confirmed", "Still unsure"],
+        contributionTypes: ["text", "image"],
+      },
+      {
+        title: "Part 3: Open reflection",
+        instructions: "Share anything you want to take away from the activity: ideas, questions, or next steps.",
+        questions: [],
+        tags: [],
+      },
     ],
   },
 ];

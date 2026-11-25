@@ -1,10 +1,11 @@
 import { all, num, str } from "./db";
+import { parseJson } from "./content";
 
 /**
  * Guiding questions and their optional sub-questions (one level). Top-level questions are revealed by the facilitator;
  * a sub-question is shown exactly when its parent is shown. Results are ordered parent first, then its sub-questions.
  */
-export interface QuestionRow { id: string; heading: string; text: string; required: boolean; parentId: string | null; visible: boolean; position: number }
+export interface QuestionRow { id: string; heading: string; text: string; required: boolean; parentId: string | null; visible: boolean; position: number; options: string[] }
 
 const ORDER = "ORDER BY COALESCE(p.position, q.position), (q.parent_id IS NOT NULL), q.position";
 
@@ -13,7 +14,7 @@ export const SHOWN = "q.deleted_at IS NULL AND ((q.parent_id IS NULL AND q.visib
 
 function map(r: Record<string, unknown>): QuestionRow {
   const parentId = r.parent_id ? str(r.parent_id) : null;
-  return { id: str(r.id), heading: parentId ? "" : str(r.heading ?? ""), text: str(r.text), required: !!num(r.required), parentId, visible: parentId ? !!num(r.parent_visible) : !!num(r.visible), position: num(r.position) };
+  return { id: str(r.id), heading: parentId ? "" : str(r.heading ?? ""), text: str(r.text), required: !!num(r.required), parentId, visible: parentId ? !!num(r.parent_visible) : !!num(r.visible), position: num(r.position), options: parseJson<string[]>(r.options_json, []) };
 }
 
 /** Every live question of a stage, for facilitators. A sub-question's `visible` is its parent's. */

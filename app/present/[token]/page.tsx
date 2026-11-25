@@ -5,7 +5,7 @@ import { useRemaining, fmt, type TimerView } from "@/components/timer";
 
 interface Item {
   id: string; label: string; kind: string; stageTitle: string;
-  entries: { questionText: string | null; kind: string; body: string; tags: string[]; table: { columns: string[]; rows: string[][] } | null; attachmentId: string | null }[];
+  entries: { questionText: string | null; choice?: string | null; kind: string; body: string; tags: string[]; table: { columns: string[]; rows: string[][] } | null; attachmentId: string | null }[];
   synthesis: string | null;
 }
 interface Data { title: string; items: Item[]; summaries: { id: string; label: string; text: string }[]; questions: { id: string; text: string }[]; timer?: TimerView }

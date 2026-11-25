@@ -9,7 +9,7 @@ import type { Detail, Act } from "./types";
 interface Pub {
   id: string; sourceType: string; sourceId: string; status: "published" | "unpublished"; labelMode: "group" | "anonymous"; labelNo: number; present: boolean; publishedAt: number; updatedAt: number; differsFromSource: boolean;
   internal: { groupName: string | null; authors: { id: string; name: string }[] };
-  preview: { label: string; stageTitle: string; entries: { questionText: string | null; body: string; table: { columns: string[]; rows: string[][] } | null; tags: string[]; attachmentId: string | null }[]; synthesis: string | null };
+  preview: { label: string; stageTitle: string; entries: { questionText: string | null; choice?: string | null; body: string; table: { columns: string[]; rows: string[][] } | null; tags: string[]; attachmentId: string | null }[]; synthesis: string | null };
   reactions: { total: number; byType: Record<string, number> };
 }
 interface Cm { id: string; targetType: string; authorName: string; groupName: string | null; promptKey: string; body: string; status: string; createdAt: number }
@@ -79,7 +79,7 @@ export function SharingTab({ d, act }: { d: Detail; act: Act }) {
                 {preview?.id === it.id && (
                   <div className="mt-3 rounded-lg bg-slate-50 p-3" aria-label="Preview of what participants see">
                     <p className="mb-2 text-sm font-semibold">Preview: this is exactly what participants see.</p>
-                    {it.preview.entries.map((e, i) => <div key={i} className="mb-2">{e.questionText && <p className="text-sm font-semibold">{e.questionText}</p>}<p className="whitespace-pre-wrap">{e.body}</p>{e.table && <TableView table={e.table} />}{e.attachmentId && <p className="text-sm">[A picture is included]</p>}</div>)}
+                    {it.preview.entries.map((e, i) => <div key={i} className="mb-2">{e.questionText && <p className="text-sm font-semibold">{e.questionText}</p>}{e.choice && <p className="text-sm font-semibold text-brand-strong">{e.choice}</p>}<p className="whitespace-pre-wrap">{e.body}</p>{e.table && <TableView table={e.table} />}{e.attachmentId && <p className="text-sm">[A picture is included]</p>}</div>)}
                     {it.preview.synthesis && <p><strong>Group response:</strong> {it.preview.synthesis}</p>}
                   </div>
                 )}

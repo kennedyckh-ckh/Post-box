@@ -19,7 +19,7 @@ function attachmentView(id: unknown) {
 
 function entryForParticipant(e: Row, viewerId: string) {
   return {
-    id: e.id, authorName: e.author_name, mine: e.author_id === viewerId, questionId: e.question_id ?? null, kind: e.kind, body: e.body,
+    id: e.id, authorName: e.author_name, mine: e.author_id === viewerId, questionId: e.question_id ?? null, choice: e.choice ?? null, kind: e.kind, body: e.body,
     tags: parseJson<string[]>(e.tags_json, []), table: e.table_json ? parseJson(e.table_json, null) : null, attachment: attachmentView(e.attachment_id),
     version: num(e.version), createdAt: num(e.created_at), updatedAt: num(e.updated_at),
   };
@@ -52,7 +52,7 @@ function stageDetail(pc: ParticipantCtx, stageId: string) {
       // Submitted work is shown as its frozen snapshot; otherwise the current draft. The label says which.
       const ref = referenceContent(groupId, str(r.id), () => groupEntries(groupId, str(r.id)).map((e) => entryForParticipant(e, me)));
       const entries = ref.snapshot
-        ? ref.snapshot.entries.map((e) => ({ id: e.id, authorName: e.authorName, mine: e.authorId === me, questionId: e.questionId, kind: e.kind, body: e.body, tags: e.tags, table: e.table, attachment: e.attachment ? { id: e.attachment.id, mime: e.attachment.mime, bytes: 0, name: e.attachment.name } : null, version: e.version, createdAt: e.createdAt, updatedAt: e.updatedAt }))
+        ? ref.snapshot.entries.map((e) => ({ id: e.id, authorName: e.authorName, mine: e.authorId === me, questionId: e.questionId, choice: e.choice ?? null, kind: e.kind, body: e.body, tags: e.tags, table: e.table, attachment: e.attachment ? { id: e.attachment.id, mime: e.attachment.mime, bytes: 0, name: e.attachment.name } : null, version: e.version, createdAt: e.createdAt, updatedAt: e.updatedAt }))
         : ref.draft;
       return { stageId: r.id, title: r.title, source: ref.source, entries, synthesis: (ref.snapshot ? ref.snapshot.synthesis?.body : synthesisOf(groupId, str(r.id)).body) || null };
     });
@@ -65,7 +65,7 @@ function stageDetail(pc: ParticipantCtx, stageId: string) {
       availability: a.availability, canWrite: a.canWrite, blockedReason: a.blocked,
     },
     // Only questions the facilitator has revealed. Hidden ones are not sent at all.
-    questions: shownQuestions(str(st.id)).map((q) => ({ id: q.id, heading: q.heading, text: q.text, required: q.required, parentId: q.parentId })),
+    questions: shownQuestions(str(st.id)).map((q) => ({ id: q.id, heading: q.heading, text: q.text, required: q.required, parentId: q.parentId, options: q.options })),
     // How many questions the facilitator is still holding back (a count only; their text is never sent).
     hiddenQuestions: hiddenTopLevelCount(str(st.id)),
     resources,
@@ -93,7 +93,7 @@ route("GET", "/stages/:sid/entries", (ctx) => {
   const ccfg = critiqueConfig(pc.session);
   const ids = rows.map((r) => str(r.id));
   // Revealing or hiding a question changes the tag, so open pages pick up newly revealed questions within seconds.
-  const qStamp = sha256(JSON.stringify(shownQuestions(ctx.params.sid).map((q) => [q.id, q.heading, q.text, q.required]))).slice(0, 16);
+  const qStamp = sha256(JSON.stringify(shownQuestions(ctx.params.sid).map((q) => [q.id, q.heading, q.text, q.required, q.options]))).slice(0, 16);
   const tag = etagFor(rows, syn, `${a.availability}:${a.canWrite}:${sub.status}:${sub.revision}:${engagementStamp("entry", ids)}:${rcfg.enabled}:${ccfg.enabled}:${qStamp}`);
   if (ctx.req.query.etag === tag) return { unchanged: true, etag: tag };
   const me = str(pc.participant.id);
@@ -129,6 +129,14 @@ function validateEntryInput(b: Record<string, unknown>, stage: Row, pc: Particip
     if (!shown && !keep) throw badRequest("That question is not part of this part.");
     questionId = qid;
   }
+  // A question with response options (for example Agree / Disagree) needs exactly one of them; the text is the reason.
+  let choice: string | null = null;
+  const qRow = questionId ? get("SELECT options_json FROM stage_questions WHERE id=?", questionId) : undefined;
+  const options = parseJson<string[]>(qRow?.options_json, []);
+  if (options.length) {
+    if (typeof b.choice !== "string" || !options.includes(b.choice)) throw badRequest(`Choose one of: ${options.join(", ")}.`, "choice_required");
+    choice = b.choice;
+  }
   let attachmentId: string | null = null;
   if (b.attachmentId !== undefined && b.attachmentId !== null && b.attachmentId !== "") {
     if (!types.includes("image")) throw badRequest("Images are not allowed in this part.");
@@ -137,11 +145,18 @@ function validateEntryInput(b: Record<string, unknown>, stage: Row, pc: Particip
     if (!att || att.owner_participant_id !== pc.participant.id || att.group_id !== pc.group!.id) throw badRequest("That picture was not found. Upload it again.");
     attachmentId = str(att.id);
   }
-  return { kind, body, tags, table, questionId, attachmentId };
+  return { kind, body, tags, table, questionId, choice, attachmentId };
+}
+
+/** Each person answers a choice question (for example Agree / Disagree) once; they edit that answer to change their mind. */
+function assertOneChoice(pid: string, c: { questionId: string | null; choice: string | null }, exceptId: string | null) {
+  if (!c.choice || !c.questionId) return;
+  const other = get("SELECT id FROM entries WHERE author_id=? AND question_id=? AND choice IS NOT NULL AND deleted_at IS NULL AND id<>?", pid, c.questionId, exceptId ?? "");
+  if (other) throw new HttpError(409, "already_answered", "You have already answered this statement. Edit your earlier answer to change it.", { entryId: str(other.id) });
 }
 
 function saveVersion(id: string, v: number, c: ReturnType<typeof validateEntryInput>) {
-  run("INSERT INTO entry_versions(entry_id,version,question_id,kind,body,tags_json,table_json,attachment_id,saved_at) VALUES(?,?,?,?,?,?,?,?,?)", id, v, c.questionId, c.kind, c.body, JSON.stringify(c.tags), c.table, c.attachmentId, now());
+  run("INSERT INTO entry_versions(entry_id,version,question_id,choice,kind,body,tags_json,table_json,attachment_id,saved_at) VALUES(?,?,?,?,?,?,?,?,?,?)", id, v, c.questionId, c.choice, c.kind, c.body, JSON.stringify(c.tags), c.table, c.attachmentId, now());
 }
 
 route("POST", "/stages/:sid/entries", (ctx) => {
@@ -162,8 +177,9 @@ route("POST", "/stages/:sid/entries", (ctx) => {
     }
     if (num(get("SELECT COUNT(*) AS c FROM entries WHERE author_id=? AND stage_id=? AND deleted_at IS NULL", pid, ctx.params.sid)!.c) >= 100) throw badRequest("You have reached the limit of 100 entries in this part.");
     if (c.attachmentId && get("SELECT 1 AS x FROM entries WHERE attachment_id=? AND deleted_at IS NULL", c.attachmentId)) throw badRequest("That picture is already attached to another entry.");
-    run("INSERT INTO entries(id,session_id,group_id,stage_id,question_id,author_id,author_name,kind,body,tags_json,table_json,attachment_id,version,client_key,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?)",
-      id, str(pc.session.id), str(pc.group!.id), ctx.params.sid, c.questionId, pid, str(pc.participant.display_name), c.kind, c.body, JSON.stringify(c.tags), c.table, c.attachmentId, key, now(), now());
+    assertOneChoice(pid, c, null);
+    run("INSERT INTO entries(id,session_id,group_id,stage_id,question_id,choice,author_id,author_name,kind,body,tags_json,table_json,attachment_id,version,client_key,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?)",
+      id, str(pc.session.id), str(pc.group!.id), ctx.params.sid, c.questionId, c.choice, pid, str(pc.participant.display_name), c.kind, c.body, JSON.stringify(c.tags), c.table, c.attachmentId, key, now(), now());
     saveVersion(id, 1, c);
     return { entry: entryForParticipant(get("SELECT * FROM entries WHERE id=?", id)!, pid), duplicate: false };
   });
@@ -193,8 +209,9 @@ route("PATCH", "/entries/:id", (ctx) => {
     // Optimistic concurrency: the edit applies only if it was made on top of the latest saved version.
     if (num(cur.version) !== base) throw new HttpError(409, "edit_conflict", "This entry was changed somewhere else (for example on another device) since you opened it. Your text has not been lost: it is still on your screen.", { current: entryForParticipant(cur, me) });
     if (c.attachmentId && get("SELECT 1 AS x FROM entries WHERE attachment_id=? AND id<>? AND deleted_at IS NULL", c.attachmentId, str(cur.id))) throw badRequest("That picture is already attached to another entry.");
+    assertOneChoice(me, c, str(cur.id));
     const v = base + 1;
-    run("UPDATE entries SET question_id=?, kind=?, body=?, tags_json=?, table_json=?, attachment_id=?, version=?, updated_at=? WHERE id=?", c.questionId, c.kind, c.body, JSON.stringify(c.tags), c.table, c.attachmentId, v, now(), str(cur.id));
+    run("UPDATE entries SET question_id=?, choice=?, kind=?, body=?, tags_json=?, table_json=?, attachment_id=?, version=?, updated_at=? WHERE id=?", c.questionId, c.choice, c.kind, c.body, JSON.stringify(c.tags), c.table, c.attachmentId, v, now(), str(cur.id));
     saveVersion(str(cur.id), v, c);
     return { entry: entryForParticipant(get("SELECT * FROM entries WHERE id=?", str(cur.id))!, me) };
   });

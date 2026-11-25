@@ -1,4 +1,5 @@
 "use client";
+import { ChoiceBadge } from "@/components/participant/entry-view";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ParticipantTimer } from "@/components/timer";
@@ -9,7 +10,7 @@ import { ReactionBar, CommentList, CommentBox, type ReactionSummary, type Commen
 
 interface Item {
   id: string; label: string; kind: string; stageTitle: string; revision: number | null;
-  entries: { questionText: string | null; kind: string; body: string; tags: string[]; table: { columns: string[]; rows: string[][] } | null; attachmentId: string | null }[];
+  entries: { questionText: string | null; choice?: string | null; kind: string; body: string; tags: string[]; table: { columns: string[]; rows: string[][] } | null; attachmentId: string | null }[];
   synthesis: string | null; reactions: ReactionSummary; comments: CommentView[];
   ai: { overview: string; points: { heading: string; text: string; kind: string }[]; simulated: boolean; label: string } | null;
 }
@@ -45,6 +46,7 @@ export default function BoardPage() {
                   {it.entries.map((e, i) => (
                     <div key={i}>
                       {e.questionText && <p className="text-sm font-semibold text-brand-strong">Responding to: {e.questionText}</p>}
+                      {e.choice && <p className="mt-1"><ChoiceBadge choice={e.choice} /></p>}
                       {e.body && <p className="whitespace-pre-wrap break-words">{e.body}</p>}
                       {e.table && <TableView table={e.table} />}
                       {e.attachmentId && (

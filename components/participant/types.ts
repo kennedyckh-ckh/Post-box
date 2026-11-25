@@ -1,11 +1,11 @@
 export interface TableData { columns: string[]; rows: string[][] }
 export interface Entry {
-  id: string; authorName: string; mine: boolean; questionId: string | null; kind: "text" | "table"; body: string; tags: string[];
+  id: string; authorName: string; mine: boolean; questionId: string | null; choice?: string | null; kind: "text" | "table"; body: string; tags: string[];
   table: TableData | null; attachment: { id: string; mime: string; bytes: number; name: string } | null; version: number; createdAt: number; updatedAt: number;
 }
 export interface StageDetail {
   stage: { id: string; title: string; instructions: string; tags: string[]; contributionTypes: string[]; availability: "open" | "closed"; canWrite: boolean; blockedReason: { code: string; message: string } | null };
-  questions: { id: string; heading?: string; text: string; required: boolean; parentId: string | null }[];
+  questions: { id: string; heading?: string; text: string; required: boolean; parentId: string | null; options?: string[] }[];
   hiddenQuestions: number;
   resources: { id: string; kind: "link" | "file"; title: string; url: string | null; attachmentId: string | null; mime: string | null }[];
   reference: { stageId: string; title: string; source: "draft" | "submitted"; entries: Entry[]; synthesis: string | null }[];

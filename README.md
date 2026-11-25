@@ -23,11 +23,13 @@ Four things are kept separate on purpose: who wrote something (**individual auth
 
 ## What it does
 
-**Sessions.** Create, edit, duplicate (clean copy), archive (read-only), restore, delete permanently (the owner types the exact title). Optional templates: blank (Part 1, 2, 3), discussion, inquiry, case analysis, reflection, project planning. Titles, group names, stage titles, instructions and guiding questions are all editable. Three stages by default; switch one or two off to use fewer. The database holds stages as a collection so more than three are possible later (the interface offers three).
+**Sessions.** Create, edit, duplicate (clean copy), archive (read-only), restore, delete permanently (the owner types the exact title). Optional templates: blank (Part 1, 2, 3), discussion, inquiry, case analysis, reflection, project planning, Post-box. Titles, group names, stage titles, instructions and guiding questions are all editable. Three stages by default; switch one or two off to use fewer. The database holds stages as a collection so more than three are possible later (the interface offers three).
 
 **Joining.** Join code + display name + group (with optional group PIN and seat cap) or facilitator-assigned groups. Optional facilitator-defined fields such as Class and Class Number; nothing school-specific is required. Every participant has a unique private identity, so two people can share a name and typing someone's name never gives access to their work. A private recovery code, or a new one issued by the facilitator, restores access on another device. The code is not shown at joining: participants open “Your recovery code” on their session page whenever they need it (stored encrypted; only their own signed-in device can display it). Refreshing keeps you signed in. Seat caps hold even when people join at the same moment (tested with 12 separate processes racing for 5 seats).
 
 **Stages.** Separate controls: enabled, visible, locked/open/closed, a per-group override, and a per-group “not taking part”. Instructions, several links, images and PDFs, as many guiding questions as the facilitator wants (required or optional), each with an optional heading and optional sub-questions (1a, 1b… shown together with their main question), all editable at any time, each shown to participants or kept hidden until the facilitator reveals it (one at a time with “Reveal next question”, individually, or all at once; also from the projector view), tags, allowed contribution types, and a reference panel showing the group's own earlier-stage work (labelled draft or submitted snapshot).
+
+**Post-box template and choice questions.** Any guiding question (or sub-question) can be set to “Choose an option, then give a reason”, with 2 to 6 options of the facilitator's own (presets: Agree / Disagree; Agree / Not sure / Disagree; True / False; Confirmed / Changed my thinking). Participants press Answer beside the statement, pick one option and write their reason; each person answers a statement once and edits that answer to change their mind. The Post-box template sets this up: Part 1 has four Agree / Disagree statements to rewrite, Part 2 has one reflection prompt per station (open answers by default; switch any station to custom options), and Part 3 is left open. Class results (exact counts and percentages of people, per option and per group) appear under each statement in the Parts tab and, when the facilitator presses “Show class results” (or V) in the projector's Questions view, full screen for the room. Counts only: no names or reasons. Hidden and deleted entries are not counted; if options are renamed after people answered, their earlier choices are counted separately as “other” until they change them. The choice is kept in submitted snapshots, shared items, exports and AI input.
 
 **Participant work.** Text entries with tags, picture attachments (PNG/JPEG, location data removed), editable data tables, each attributed. Saving is acknowledged by the server before the screen says saved; stale edits are never silently overwritten (a conflict shows both versions and lets you choose); version history is kept. Groups stay in sync by polling every few seconds. An optional jointly written group response sits beside, and never replaces, the individual entries.
 
@@ -53,7 +55,7 @@ Requires Node.js 22 or newer.
 
 ```bash
 npm ci
-npm test                 # 120 automated tests
+npm test                 # 135 automated tests
 npm run build
 BOOTSTRAP_ADMIN_EMAIL=you@example.org BOOTSTRAP_ADMIN_NAME="You" BOOTSTRAP_ADMIN_PASSWORD="a-long-temporary-password" npm start
 ```
@@ -80,7 +82,7 @@ Other commands: `npm run dev`, `npm run lint`, `npm run typecheck`, `npm run bac
 
 See `docs/TEST-REPORT.md` for the detail. In short:
 
-- **Automated tests (132):** editing questions and headings, sub-questions, timer, reaction icons, question reveal, recovery code viewed later, access control, joining, recovery, seat caps across processes, stage release, submission and versions, reopening, sharing and anonymity, projector content, reactions, peer responses, exports, uploads, the AI workflow with the simulator and with **mocked** HKU responses, usage limits, persistence across a restart, backup and restore, English and Traditional Chinese.
+- **Automated tests (135):** the Post-box template, Agree / Disagree and custom-option questions with class results, editing questions and headings, sub-questions, timer, reaction icons, question reveal, recovery code viewed later, access control, joining, recovery, seat caps across processes, stage release, submission and versions, reopening, sharing and anonymity, projector content, reactions, peer responses, exports, uploads, the AI workflow with the simulator and with **mocked** HKU responses, usage limits, persistence across a restart, backup and restore, English and Traditional Chinese.
 - **Checked by hand in a browser (Chromium):** the main screens work; automated accessibility checks (axe-core) found no violations on 20 page states after one fix; no sideways scrolling at phone width after fixing two overflows.
 - **Rehearsed:** clean checkout, install, build, start, bootstrap, sign-in, restart, data still there.
 - **NOT verified:** deployment on Render; any live request to the HKU service (only mocked); use with a screen reader, and keyboard-only use beyond what the automated checks cover; browsers other than Chromium; real phones; heavy load; an independent security review. WCAG 2.2 AA is the design target, **not a certification**.

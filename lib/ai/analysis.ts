@@ -104,17 +104,18 @@ export function buildInput(sessionId: string, scope: Scope): Built {
     const gname = str(get("SELECT name FROM groups WHERE id=?", gid)?.name);
     for (const st of stages) {
       const state = submissionState(gid, str(st.id));
-      let rows: { id: string; version: number; kind: string; body: string; tags: string[]; table: { columns: string[]; rows: string[][] } | null; questionId: string | null; questionText: string | null }[] = [];
+      let rows: { id: string; version: number; kind: string; body: string; tags: string[]; table: { columns: string[]; rows: string[][] } | null; questionId: string | null; questionText: string | null; choice: string | null }[] = [];
       let fromSnapshot = false;
       if (state.status === "submitted") {
         const sub = get("SELECT snapshot_json FROM submissions WHERE id=?", state.submissionId!)!;
         const snap = parseJson<Snapshot | null>(sub.snapshot_json, null);
-        rows = (snap?.entries ?? []).map((e) => ({ id: e.id, version: e.version, kind: e.kind, body: e.body, tags: e.tags, table: e.table as never, questionId: e.questionId, questionText: e.questionText }));
+        rows = (snap?.entries ?? []).map((e) => ({ id: e.id, version: e.version, kind: e.kind, body: e.body, tags: e.tags, table: e.table as never, questionId: e.questionId, questionText: e.questionText, choice: e.choice ?? null }));
         fromSnapshot = true;
       } else if (scope.includeDrafts) {
         rows = all("SELECT * FROM entries WHERE group_id=? AND stage_id=? AND deleted_at IS NULL AND hidden_at IS NULL ORDER BY created_at, id", gid, str(st.id)).map((e) => ({
           id: str(e.id), version: num(e.version), kind: str(e.kind), body: str(e.body), tags: parseJson<string[]>(e.tags_json, []), table: e.table_json ? parseJson(e.table_json, null) : null, questionId: e.question_id ? str(e.question_id) : null,
           questionText: e.question_id ? str(get("SELECT text FROM stage_questions WHERE id=?", str(e.question_id))?.text) || null : null,
+          choice: e.choice ? str(e.choice) : null,
         }));
       } else {
         skipped.push({ group: gname, part: str(st.title), reason: state.status === "reopened" ? "reopened and not yet resubmitted" : "not submitted" });
@@ -123,7 +124,7 @@ export function buildInput(sessionId: string, scope: Scope): Built {
       for (const r of rows) {
         if (qFilter.size && !(r.questionId && qFilter.has(r.questionId))) continue;
         const alias = `E${++n}`;
-        const body = [r.body, tableText(r.table)].filter(Boolean).join(" ");
+        const body = [r.choice ? `[${r.choice}]` : "", r.body, tableText(r.table)].filter(Boolean).join(" ");
         const comments = scope.includeComments ? all("SELECT body FROM peer_comments WHERE target_type='entry' AND target_id=? AND status='approved' ORDER BY created_at", r.id).map((c) => str(c.body)) : [];
         entries.push({ alias, groupLabel: labels.get(gid)!, partTitle: str(st.title), questionText: r.questionText, text: body, tags: r.tags, peerComments: comments });
         sources.push({ alias, entryId: r.id, version: r.version, groupId: gid, stageId: str(st.id), fromSnapshot });

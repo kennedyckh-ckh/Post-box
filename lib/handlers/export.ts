@@ -33,7 +33,7 @@ function build(s: Row, identified: boolean) {
 
   const participantContent = {
     entries: entries.map((e) => ({
-      entryId: e.id, stageId: e.stage_id, stageTitle: stageTitle.get(str(e.stage_id)), group: g(e.group_id), questionId: e.question_id ?? null, questionText: e.question_id ? qText.get(str(e.question_id)) ?? null : null,
+      entryId: e.id, stageId: e.stage_id, stageTitle: stageTitle.get(str(e.stage_id)), group: g(e.group_id), questionId: e.question_id ?? null, questionText: e.question_id ? qText.get(str(e.question_id)) ?? null : null, choice: e.choice ?? null,
       author: p(e.author_id), authorName: identified ? str(e.author_name) : undefined, kind: e.kind, body: e.body, tags: parseJson<string[]>(e.tags_json, []),
       table: e.table_json ? parseJson(e.table_json, null) : null, attachment: e.attachment_id ? { id: e.attachment_id, note: "file not embedded; download separately" } : null,
       version: num(e.version), createdAt: num(e.created_at), updatedAt: num(e.updated_at), hiddenByFacilitator: !!e.hidden_at,
@@ -52,7 +52,7 @@ function build(s: Row, identified: boolean) {
   const facilitatorContent = {
     stages: stages.map((st) => ({
       id: st.id, position: num(st.position), title: st.title, enabled: !!num(st.enabled), instructions: st.instructions, tags: parseJson<string[]>(st.tags_json, []),
-      questions: allQuestions(str(st.id)).map((q) => ({ id: q.id, heading: q.heading, text: q.text, required: q.required, parentId: q.parentId, visibleToParticipants: q.visible })),
+      questions: allQuestions(str(st.id)).map((q) => ({ id: q.id, heading: q.heading, text: q.text, required: q.required, parentId: q.parentId, visibleToParticipants: q.visible, responseOptions: q.options })),
       resources: all("SELECT kind,title,url,attachment_id FROM stage_resources WHERE stage_id=? ORDER BY position", str(st.id)).map((r) => ({ kind: r.kind, title: r.title, url: r.url ?? null, attachmentId: r.attachment_id ?? null })),
     })),
     shared: pubs.map((x) => ({

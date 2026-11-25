@@ -1,4 +1,5 @@
 import { all, get, run, tx, now, num, str, audit, type Row } from "../db";
+import { stageTallies } from "../tally";
 import { newId, randomToken, sha256 } from "../crypto";
 import { route, badRequest, conflict, forbidden, notFound, type Ctx } from "../router";
 import { requireStaff, requireParticipant, facilitatorSession, mustBeEditable, type ParticipantCtx } from "../authz";
@@ -282,8 +283,10 @@ route("GET", "/sessions/:id/projector", (ctx) => {
     });
     return {
       id: str(stg.id), position: num(stg.position), title: str(stg.title), visible: !!num(stg.visible), availability: str(stg.availability), instructions: str(stg.instructions),
-      questions: qs.filter((q) => q.visible).map((q) => ({ id: q.id, heading: q.heading, text: q.text, required: q.required, parentId: q.parentId })),
+      questions: qs.filter((q) => q.visible).map((q) => ({ id: q.id, heading: q.heading, text: q.text, required: q.required, parentId: q.parentId, options: q.options })),
       hiddenQuestions: qs.filter((q) => !q.visible && !q.parentId).length,
+      // Class results (counts only, no names or texts) for revealed questions with response options such as Agree / Disagree.
+      tallies: stageTallies(str(stg.id), { visibleOnly: true }).map((t) => ({ questionId: t.questionId, options: t.options, other: t.other, total: t.total, byGroup: t.byGroup })),
       expected: expected.size, submitted: perGroup.filter((x) => x.expected && x.status === "submitted").length, perGroup,
     };
   });

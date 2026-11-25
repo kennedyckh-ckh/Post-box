@@ -1,4 +1,5 @@
 "use client";
+import { ChoiceBadge } from "@/components/participant/entry-view";
 import { useCallback, useEffect, useState } from "react";
 import { api, errText } from "@/lib/client/api";
 import { Card, Button, Alert, Badge, Field, inputCls } from "@/components/ui";
@@ -6,7 +7,7 @@ import { TableView, timeText } from "@/components/participant/entry-view";
 import type { Detail, Act } from "./types";
 import type { TableData } from "@/components/participant/types";
 
-interface E { reactions?: { total: number; byType: Record<string, number> }; id: string; groupId: string; stageId: string; questionId: string | null; authorId: string; authorName: string; kind: "text" | "table"; body: string; tags: string[]; table: TableData | null; attachmentId: string | null; version: number; updatedAt: number; hidden: boolean }
+interface E { reactions?: { total: number; byType: Record<string, number> }; id: string; groupId: string; stageId: string; questionId: string | null; choice?: string | null; authorId: string; authorName: string; kind: "text" | "table"; body: string; tags: string[]; table: TableData | null; attachmentId: string | null; version: number; updatedAt: number; hidden: boolean }
 
 export function ContributionsTab({ d, act }: { d: Detail; act: Act }) {
   const [stageId, setStageId] = useState("");
@@ -48,6 +49,7 @@ export function ContributionsTab({ d, act }: { d: Detail; act: Act }) {
                     <Button variant="secondary" disabled={d.session.status === "archived"} onClick={() => void act(() => api("POST", `/entries/${e.id}/hide`, { hidden: !e.hidden }), e.hidden ? "Entry is visible to the group again." : "Entry hidden from the group.").then(load)}>{e.hidden ? "Show to group again" : "Hide from group"}</Button>
                   </span>
                 </div>
+                {e.choice && <p className="mb-1"><ChoiceBadge choice={e.choice} /></p>}
                 {e.body && <p className="whitespace-pre-wrap break-words">{e.body}</p>}
                 {e.table && <TableView table={e.table} />}
                 {e.attachmentId && (

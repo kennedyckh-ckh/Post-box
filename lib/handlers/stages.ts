@@ -3,7 +3,8 @@ import { newId } from "../crypto";
 import { route, badRequest, conflict, notFound, forbidden, HttpError, type Ctx } from "../router";
 import { requireStaff, facilitatorSession, groupForFacilitator, mustBeEditable } from "../authz";
 import { obj, text, bool, oneOf, int } from "../validate";
-import { parseJson } from "../content";
+import { parseJson, cleanOptions } from "../content";
+import { stageTallies } from "../tally";
 import { allQuestions } from "../questions";
 import { validateAndStore, removeStored, FILE_LIMITS } from "../files";
 import { expectedGroups, submissionState } from "../submissions";
@@ -31,7 +32,7 @@ route("GET", "/sessions/:id/stages", (ctx) => {
     id: st.id, position: num(st.position), title: st.title, enabled: !!num(st.enabled), visible: !!num(st.visible), availability: st.availability,
     instructions: st.instructions, tags: parseJson<string[]>(st.tags_json, []), contributionTypes: parseJson<string[]>(st.contribution_types_json, []),
     referenceStageIds: parseJson<string[]>(st.reference_stage_ids_json, []),
-    questions: questionsOf(str(st.id)), resources: resourcesOf(str(st.id)),
+    questions: questionsOf(str(st.id)), resources: resourcesOf(str(st.id)), tallies: stageTallies(str(st.id)),
     entryCount: num(get("SELECT COUNT(*) AS c FROM entries WHERE stage_id=? AND deleted_at IS NULL", str(st.id))!.c),
   }));
   const groupSettings = all("SELECT g.group_id, g.stage_id, g.availability_override, g.excluded FROM group_stage_settings g JOIN groups x ON x.id=g.group_id WHERE x.session_id=?", str(s.id)).map((r) => ({
@@ -139,7 +140,9 @@ route("POST", "/stages/:sid/questions", (ctx) => {
   // Optional heading, for main questions only.
   const heading = parentId ? "" : text(b.heading, "Heading", { max: 120, optional: true }).trim();
   if (parentId && typeof b.heading === "string" && b.heading.trim()) throw badRequest("Headings are for main questions only.");
-  run("INSERT INTO stage_questions(id,stage_id,position,text,required,visible,parent_id,heading) VALUES(?,?,?,?,?,?,?,?)", id, str(stage.id), pos, t, b.required === true ? 1 : 0, visible ? 1 : 0, parentId, heading);
+  // Optional response options (for example Agree / Disagree): participants then choose one and give a reason.
+  const options = cleanOptions(b.options);
+  run("INSERT INTO stage_questions(id,stage_id,position,text,required,visible,parent_id,heading,options_json) VALUES(?,?,?,?,?,?,?,?,?)", id, str(stage.id), pos, t, b.required === true ? 1 : 0, visible ? 1 : 0, parentId, heading, JSON.stringify(options));
   audit("facilitator", u.id, "question_added", { sessionId: str(session.id), target: id });
   return { id };
 });
@@ -165,6 +168,8 @@ route("PATCH", "/questions/:qid", (ctx) => {
     if (q.parent_id && h) throw badRequest("Headings are for main questions only.");
     sets.push("heading=?"); vals.push(h);
   }
+  // Changing the options keeps earlier answers; a choice that no longer matches is shown as "other" in the class results.
+  if (b.options !== undefined) { sets.push("options_json=?"); vals.push(JSON.stringify(cleanOptions(b.options))); }
   let visibility: boolean | undefined;
   if (b.visible !== undefined) {
     if (q.parent_id) throw badRequest("A sub-question is shown together with its main question. Reveal or hide the main question instead.");
@@ -297,7 +302,7 @@ route("PUT", "/groups/:gid/stages/:sid", (ctx) => {
 
 export function entryRow(e: Row) {
   return {
-    id: e.id, groupId: e.group_id, stageId: e.stage_id, questionId: e.question_id ?? null, authorId: e.author_id, authorName: e.author_name,
+    id: e.id, groupId: e.group_id, stageId: e.stage_id, questionId: e.question_id ?? null, choice: e.choice ?? null, authorId: e.author_id, authorName: e.author_name,
     kind: e.kind, body: e.body, tags: parseJson<string[]>(e.tags_json, []), table: e.table_json ? parseJson(e.table_json, null) : null,
     attachmentId: e.attachment_id ?? null, version: num(e.version), createdAt: num(e.created_at), updatedAt: num(e.updated_at), hidden: !!e.hidden_at,
   };
