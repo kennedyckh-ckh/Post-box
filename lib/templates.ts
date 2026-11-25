@@ -4,6 +4,8 @@ export interface StageTemplate {
   questions: { text: string; required: boolean; heading?: string; options?: string[] }[];
   tags: string[];
   contributionTypes?: string[];
+  /** "individual": each person submits each answer on its own (no group submission). Default "group". */
+  submitMode?: "group" | "individual";
 }
 export interface Template {
   key: string;
@@ -76,17 +78,19 @@ export const TEMPLATES: Template[] = [
     stages: [
       {
         title: "Part 1: Post-box statements",
-        instructions: "Read each statement. Choose Agree or Disagree, then write your reason below. Answer on your own first: your group can see your answer, and the class sees only the totals when your facilitator shows them.",
-        questions: [1, 2, 3, 4].map((n) => ({ heading: `Statement ${n}`, text: `Edit this text to write statement ${n}.`, required: true, options: AGREE })),
+        instructions: "Read each statement. Choose Agree or Disagree, write your reason, then submit that statement. Submit each statement on its own as you go. Your group can see your answer; the class sees only the totals when your facilitator shows them.",
+        questions: [1, 2, 3, 4].map((n) => ({ heading: `Statement ${n}`, text: `Edit this text to write statement ${n}.`, required: false, options: AGREE })),
         tags: ["Evidence", "Example", "Experience", "Question"],
         contributionTypes: ["text"],
+        submitMode: "individual",
       },
       {
         title: "Part 2: Station reflections",
-        instructions: "Reflect on each station you visited. Use the prompt for each station, and refer to your group's reasons from Part 1 where it helps.",
+        instructions: "Reflect on each station you visited, and submit each station's reflection on its own. Refer to your group's reasons from Part 1 where it helps.",
         questions: [1, 2, 3, 4].map((n) => ({ heading: `Station ${n}`, text: "What did you notice at this station, and how did it change or confirm your thinking?", required: false })),
         tags: ["Noticing", "Changed my mind", "Confirmed", "Still unsure"],
         contributionTypes: ["text", "image"],
+        submitMode: "individual",
       },
       {
         title: "Part 3: Open reflection",

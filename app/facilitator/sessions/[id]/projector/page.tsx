@@ -10,9 +10,10 @@ interface PStage {
   id: string; position: number; title: string; visible: boolean; availability: "locked" | "open" | "closed"; instructions: string;
   questions: { id: string; heading?: string; text: string; required: boolean; parentId: string | null; options?: string[] }[]; hiddenQuestions: number;
   tallies?: PTally[];
-  expected: number; submitted: number; perGroup: { groupId: string; status: "draft" | "submitted" | "reopened"; entries: number; expected: boolean }[];
+  submitMode?: "group" | "individual"; individual?: { submittedAnswers: number; draftAnswers: number; people: number };
+  expected: number; submitted: number; perGroup: { groupId: string; status: "draft" | "submitted" | "reopened"; entries: number; submittedAnswers?: number; expected: boolean }[];
 }
-interface PTally { questionId: string; options: { label: string; count: number }[]; other: number; total: number }
+interface PTally { questionId: string; options: { label: string; count: number }[]; other: number; total: number; pending?: number }
 interface Feed {
   title: string; status: string; joinCode: string; joiningOpen: boolean; participants: number;
   groups: { id: string; name: string; members: number }[];
@@ -257,16 +258,25 @@ export default function ProjectorPage({ params }: { params: Promise<{ id: string
               !stage ? <Empty title="No parts to show" text="Switch on and show a part to participants first." /> : (
                 <div className="mx-auto w-full max-w-[1500px]">
                   <StageHeading stage={stage} index={stages.findIndex((s) => s.id === stage.id)} total={stages.length} />
-                  <p className="mt-[3vh] font-display text-[clamp(2rem,4vw,4.2rem)] font-semibold leading-none">
-                    <span className="text-[#9fd0cb]">{stage.submitted}</span> <span className="text-white/50">of</span> {stage.expected} <span className="text-[clamp(1.2rem,2vw,2rem)] font-normal text-white/70">groups have submitted</span>
-                  </p>
-                  <div className="mt-4 h-3 w-full overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-[#9fd0cb] transition-all" style={{ width: `${stage.expected ? (stage.submitted / stage.expected) * 100 : 0}%` }} /></div>
+                  {stage.submitMode === "individual" && stage.individual ? (
+                    <p className="mt-[3vh] font-display text-[clamp(2rem,4vw,4.2rem)] font-semibold leading-none">
+                      <span className="text-[#9fd0cb]">{stage.individual.submittedAnswers}</span> <span className="text-[clamp(1.2rem,2vw,2rem)] font-normal text-white/70">{stage.individual.submittedAnswers === 1 ? "answer" : "answers"} submitted by {stage.individual.people} of {d.participants} {d.participants === 1 ? "person" : "people"}</span>
+                    </p>
+                  ) : (
+                    <>
+                      <p className="mt-[3vh] font-display text-[clamp(2rem,4vw,4.2rem)] font-semibold leading-none">
+                        <span className="text-[#9fd0cb]">{stage.submitted}</span> <span className="text-white/50">of</span> {stage.expected} <span className="text-[clamp(1.2rem,2vw,2rem)] font-normal text-white/70">groups have submitted</span>
+                      </p>
+                      <div className="mt-4 h-3 w-full overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-[#9fd0cb] transition-all" style={{ width: `${stage.expected ? (stage.submitted / stage.expected) * 100 : 0}%` }} /></div>
+                    </>
+                  )}
                   <ul className="mt-[4vh] grid gap-[1.4vw] [grid-template-columns:repeat(auto-fill,minmax(min(100%,15rem),1fr))]">
                     {d.groups.map((g) => {
                       const c = stage.perGroup.find((x) => x.groupId === g.id);
-                      const st = !c || !c.expected ? "out" : c.status === "submitted" ? "done" : c.entries > 0 ? "working" : "waiting";
+                      const indiv = stage.submitMode === "individual";
+                      const st = !c || !c.expected ? "out" : indiv ? ((c.submittedAnswers ?? 0) > 0 ? "done" : c.entries > 0 ? "working" : "waiting") : c.status === "submitted" ? "done" : c.entries > 0 ? "working" : "waiting";
                       const tone = { done: "bg-[#9fd0cb] text-[#0c1a20]", working: "bg-white/12 text-white ring-1 ring-[#e8b384]/60", waiting: "bg-white/[0.06] text-white/70 ring-1 ring-white/15", out: "bg-transparent text-white/40 ring-1 ring-dashed ring-white/15" }[st];
-                      const word = { done: "Submitted", working: c?.status === "reopened" ? "Revising" : "Working", waiting: "Not started", out: "Not taking part" }[st];
+                      const word = { done: indiv ? `${c?.submittedAnswers ?? 0} ${c?.submittedAnswers === 1 ? "answer" : "answers"} submitted` : "Submitted", working: c?.status === "reopened" ? "Revising" : "Working", waiting: "Not started", out: "Not taking part" }[st];
                       return (
                         <li key={g.id} className={`rounded-2xl p-5 ${tone}`}>
                           <p className="font-display text-[clamp(1.2rem,1.8vw,1.9rem)] font-semibold">{g.name}</p>
@@ -414,7 +424,7 @@ function ClassResults({ stage }: { stage: PStage }) {
                   </li>
                 ))}
               </ul>
-              <p className="mt-[1.6vh] text-[clamp(0.85rem,1.1vw,1.2rem)] text-white/60">{t.total} {t.total === 1 ? "response" : "responses"}{t.other > 0 ? ` · ${t.other} under earlier options` : ""}</p>
+              <p className="mt-[1.6vh] text-[clamp(0.85rem,1.1vw,1.2rem)] text-white/60">{t.total} {t.total === 1 ? "response" : "responses"}{t.pending ? ` · ${t.pending} not yet submitted` : ""}{t.other > 0 ? ` · ${t.other} under earlier options` : ""}</p>
             </li>
           );
         })}

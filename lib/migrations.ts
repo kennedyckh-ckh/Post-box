@@ -469,4 +469,15 @@ ALTER TABLE entry_versions ADD COLUMN choice TEXT;
 CREATE INDEX idx_entries_question_choice ON entries(question_id, choice);
 `,
   },
+  {
+    id: "010_individual_submission",
+    sql: `
+-- How a part is handed in. 'group' (default, as before): the group submits the whole part together and it locks for the
+-- group. 'individual': each person submits each of their own answers separately; there is no group submission.
+ALTER TABLE stages ADD COLUMN submit_mode TEXT NOT NULL DEFAULT 'group' CHECK(submit_mode IN ('group','individual'));
+-- When the author submitted this entry (individual parts only). Submitted entries are read-only for the author until a
+-- facilitator returns them.
+ALTER TABLE entries ADD COLUMN submitted_at INTEGER;
+`,
+  },
 ];

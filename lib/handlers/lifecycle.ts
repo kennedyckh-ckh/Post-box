@@ -35,8 +35,8 @@ route("POST", "/sessions/:id/duplicate", (ctx) => {
         const nid = newId("stg");
         stageMap.set(str(st.id), nid);
         run(
-          "INSERT INTO stages(id,session_id,position,title,enabled,visible,availability,instructions,contribution_types_json,tags_json) VALUES(?,?,?,?,?,?,'locked',?,?,?)",
-          nid, id, num(st.position), str(st.title), num(st.enabled), num(st.visible), str(st.instructions), str(st.contribution_types_json), str(st.tags_json)
+          "INSERT INTO stages(id,session_id,position,title,enabled,visible,availability,instructions,contribution_types_json,tags_json,submit_mode) VALUES(?,?,?,?,?,?,'locked',?,?,?,?)",
+          nid, id, num(st.position), str(st.title), num(st.enabled), num(st.visible), str(st.instructions), str(st.contribution_types_json), str(st.tags_json), str(st.submit_mode ?? "group")
         );
         const qMap = new Map<string, string>();
         // parents first, so each sub-question can point at its parent's copy

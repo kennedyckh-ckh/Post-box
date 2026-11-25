@@ -33,6 +33,8 @@ export function EntryEditor({ detail, editing, presetQuestionId, onDone, onState
   const options = detail.questions.find((q) => q.id === questionId)?.options ?? [];
   const isChoice = options.length > 0;
   const choiceOk = !isChoice || options.includes(choice);
+  // In a part where each person submits each answer on its own, the editor can save a draft or submit this answer.
+  const individual = st.submitMode === "individual";
   const [table, setTable] = useState<TableData>(editing?.table ?? newTable());
   const [attachment, setAttachment] = useState<Entry["attachment"]>(editing?.attachment ?? null);
   const [base, setBase] = useState(editing?.version ?? 0);
@@ -49,14 +51,14 @@ export function EntryEditor({ detail, editing, presetQuestionId, onDone, onState
     return () => window.removeEventListener("beforeunload", h);
   }, []);
 
-  async function save(overrideBase?: number) {
+  async function save(overrideBase?: number, submit = false) {
     setBusy(true); setError(""); onState("saving");
-    const payload = { kind, body, tags, questionId: questionId || null, choice: isChoice ? choice : null, table: kind === "table" ? table : undefined, attachmentId: attachment?.id ?? null };
+    const payload = { kind, body, tags, submit: submit || undefined, questionId: questionId || null, choice: isChoice ? choice : null, table: kind === "table" ? table : undefined, attachmentId: attachment?.id ?? null };
     try {
       if (editing) await api("PATCH", `/entries/${editing.id}`, { ...payload, baseVersion: overrideBase ?? base });
       else await api("POST", `/stages/${st.id}/entries`, { ...payload, clientKey: key.current });
       dirty.current = false; setConflict(null);
-      onState("saved");
+      onState("saved", submit ? "Submitted." : undefined);
       onDone();
     } catch (e) {
       if (e instanceof ApiError && e.code === "edit_conflict") {
@@ -152,8 +154,14 @@ export function EntryEditor({ detail, editing, presetQuestionId, onDone, onState
           )}
         </div>
       )}
+      {individual && <p className="mb-2 text-sm text-muted">Submit sends this answer on its own; your other answers are not affected. Once submitted you cannot change it unless your facilitator returns it. A draft is saved but not counted yet.</p>}
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" disabled={busy || !choiceOk || (kind === "text" && !body.trim())}>{busy ? "Saving…" : isChoice ? "Save my answer" : "Save entry"}</Button>
+        {individual ? (
+          <>
+            <Button disabled={busy || !choiceOk || (kind === "text" && !body.trim())} onClick={() => void save(undefined, true)}>{busy ? "Saving…" : "Submit this answer"}</Button>
+            <Button type="submit" variant="secondary" disabled={busy || !choiceOk || (kind === "text" && !body.trim())}>Save as draft</Button>
+          </>
+        ) : <Button type="submit" disabled={busy || !choiceOk || (kind === "text" && !body.trim())}>{busy ? "Saving…" : isChoice ? "Save my answer" : "Save entry"}</Button>}
         <Button variant="secondary" disabled={busy} onClick={() => { if (!dirty.current || confirm("Discard your changes to this entry?")) { dirty.current = false; onState("idle"); onDone(); } }}>Cancel</Button>
       </div>
     </form>

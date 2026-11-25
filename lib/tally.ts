@@ -1,4 +1,4 @@
-import { all, num, str } from "./db";
+import { all, get, num, str } from "./db";
 import { allQuestions, questionLabels } from "./questions";
 
 /**
@@ -15,6 +15,8 @@ export interface QuestionTally {
   visible: boolean;
   options: { label: string; count: number }[];
   other: number;
+  /** Individual parts: answers saved but not yet submitted (not included in the counts). */
+  pending: number;
   total: number;
   byGroup: { groupId: string; counts: Record<string, number>; total: number }[];
 }
@@ -24,12 +26,16 @@ export function stageTallies(stageId: string, opts: { visibleOnly?: boolean } = 
   const labels = questionLabels(qs);
   const withOptions = qs.filter((q) => q.options.length > 0 && (!opts.visibleOnly || q.visible));
   if (!withOptions.length) return [];
+  // In a part where each person submits their own answers, only submitted answers count; drafts are reported as pending.
+  const individual = get("SELECT submit_mode FROM stages WHERE id=?", stageId)?.submit_mode === "individual";
+  const done = individual ? "AND submitted_at IS NOT NULL" : "";
   const rows = all(
     `SELECT question_id, group_id, choice, COUNT(DISTINCT author_id) AS n FROM entries
-     WHERE stage_id=? AND question_id IS NOT NULL AND choice IS NOT NULL AND deleted_at IS NULL AND hidden_at IS NULL
+     WHERE stage_id=? AND question_id IS NOT NULL AND choice IS NOT NULL AND deleted_at IS NULL AND hidden_at IS NULL ${done}
      GROUP BY question_id, group_id, choice`,
     stageId
   );
+  const pendingRows = individual ? all("SELECT question_id, COUNT(*) AS n FROM entries WHERE stage_id=? AND choice IS NOT NULL AND deleted_at IS NULL AND hidden_at IS NULL AND submitted_at IS NULL GROUP BY question_id", stageId) : [];
   return withOptions.map((q) => {
     const mine = rows.filter((r) => str(r.question_id) === q.id);
     const counts = new Map<string, number>(q.options.map((o) => [o, 0]));
@@ -48,6 +54,7 @@ export function stageTallies(stageId: string, opts: { visibleOnly?: boolean } = 
     const options = q.options.map((o) => ({ label: o, count: counts.get(o)! }));
     return {
       questionId: q.id, label: labels.get(q.id) ?? "", heading: q.heading, text: q.text, visible: q.visible, options, other,
+      pending: num(pendingRows.find((r) => str(r.question_id) === q.id)?.n ?? 0),
       total: options.reduce((a, o) => a + o.count, 0) + other,
       byGroup: [...groups].map(([groupId, g]) => ({ groupId, ...g })),
     };

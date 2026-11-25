@@ -37,3 +37,10 @@ export function ChoiceBadge({ choice }: { choice: string }) {
   const tone = /^(agree|yes|true)/.test(c) ? "bg-emerald-100 text-emerald-900 ring-emerald-700/30" : /^(disagree|no|false)/.test(c) ? "bg-rose-100 text-rose-900 ring-rose-700/30" : "bg-brand-soft text-brand-strong ring-brand/30";
   return <span className={`inline-flex items-center rounded-full px-3 py-0.5 text-sm font-semibold ring-1 ${tone}`}><span className="sr-only">Chose: </span>{choice}</span>;
 }
+
+/** Individual parts: whether one of your answers is handed in yet. */
+export function SubmittedBadge({ at }: { at: number | null | undefined }) {
+  return at
+    ? <span className="inline-flex items-center gap-1 rounded-full bg-emerald-700 px-2.5 py-0.5 text-xs font-semibold text-white"><span aria-hidden="true">✓</span> Submitted</span>
+    : <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-900 ring-1 ring-amber-700/30">Draft, not submitted</span>;
+}

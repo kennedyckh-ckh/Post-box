@@ -106,7 +106,16 @@ export function buildInput(sessionId: string, scope: Scope): Built {
       const state = submissionState(gid, str(st.id));
       let rows: { id: string; version: number; kind: string; body: string; tags: string[]; table: { columns: string[]; rows: string[][] } | null; questionId: string | null; questionText: string | null; choice: string | null }[] = [];
       let fromSnapshot = false;
-      if (state.status === "submitted") {
+      const individual = get("SELECT submit_mode FROM stages WHERE id=?", str(st.id))?.submit_mode === "individual";
+      if (individual) {
+        // Each person submits their own answers here: use the submitted ones (and drafts only if asked for).
+        rows = all(`SELECT * FROM entries WHERE group_id=? AND stage_id=? AND deleted_at IS NULL AND hidden_at IS NULL ${scope.includeDrafts ? "" : "AND submitted_at IS NOT NULL"} ORDER BY created_at, id`, gid, str(st.id)).map((e) => ({
+          id: str(e.id), version: num(e.version), kind: str(e.kind), body: str(e.body), tags: parseJson<string[]>(e.tags_json, []), table: e.table_json ? parseJson(e.table_json, null) : null, questionId: e.question_id ? str(e.question_id) : null,
+          questionText: e.question_id ? str(get("SELECT text FROM stage_questions WHERE id=?", str(e.question_id))?.text) || null : null,
+          choice: e.choice ? str(e.choice) : null,
+        }));
+        fromSnapshot = false;
+      } else if (state.status === "submitted") {
         const sub = get("SELECT snapshot_json FROM submissions WHERE id=?", state.submissionId!)!;
         const snap = parseJson<Snapshot | null>(sub.snapshot_json, null);
         rows = (snap?.entries ?? []).map((e) => ({ id: e.id, version: e.version, kind: e.kind, body: e.body, tags: e.tags, table: e.table as never, questionId: e.questionId, questionText: e.questionText, choice: e.choice ?? null }));

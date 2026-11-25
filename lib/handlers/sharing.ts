@@ -7,7 +7,7 @@ import { stageAccess } from "../stages";
 import { obj, text, bool, oneOf } from "../validate";
 import { hit } from "../throttle";
 import { parseJson } from "../content";
-import { expectedGroups, submissionState } from "../submissions";
+import { expectedGroups, submissionState, individualProgress } from "../submissions";
 import { allQuestions } from "../questions";
 import { timerView } from "../timer";
 import { buildContent, sourceVersionOf, publicView, reactionConfig, critiqueConfig, reactionSummary, commentsFor, upsertPublication, type PubContent } from "../sharing";
@@ -279,14 +279,16 @@ route("GET", "/sessions/:id/projector", (ctx) => {
     const perGroup = groups.map((g) => {
       const state = submissionState(str(g.id), str(stg.id));
       const entries = num(get("SELECT COUNT(*) AS c FROM entries WHERE group_id=? AND stage_id=? AND deleted_at IS NULL AND hidden_at IS NULL", str(g.id), str(stg.id))!.c);
-      return { groupId: str(g.id), status: state.status, entries, expected: expected.has(str(g.id)) };
+      const submittedAnswers = num(get("SELECT COUNT(*) AS c FROM entries WHERE group_id=? AND stage_id=? AND deleted_at IS NULL AND hidden_at IS NULL AND submitted_at IS NOT NULL", str(g.id), str(stg.id))!.c);
+      return { groupId: str(g.id), status: state.status, entries, submittedAnswers, expected: expected.has(str(g.id)) };
     });
     return {
       id: str(stg.id), position: num(stg.position), title: str(stg.title), visible: !!num(stg.visible), availability: str(stg.availability), instructions: str(stg.instructions),
       questions: qs.filter((q) => q.visible).map((q) => ({ id: q.id, heading: q.heading, text: q.text, required: q.required, parentId: q.parentId, options: q.options })),
       hiddenQuestions: qs.filter((q) => !q.visible && !q.parentId).length,
       // Class results (counts only, no names or texts) for revealed questions with response options such as Agree / Disagree.
-      tallies: stageTallies(str(stg.id), { visibleOnly: true }).map((t) => ({ questionId: t.questionId, options: t.options, other: t.other, total: t.total, byGroup: t.byGroup })),
+      tallies: stageTallies(str(stg.id), { visibleOnly: true }).map((t) => ({ questionId: t.questionId, options: t.options, other: t.other, total: t.total, pending: t.pending, byGroup: t.byGroup })),
+      submitMode: str(stg.submit_mode ?? "group"), individual: individualProgress(str(stg.id)),
       expected: expected.size, submitted: perGroup.filter((x) => x.expected && x.status === "submitted").length, perGroup,
     };
   });

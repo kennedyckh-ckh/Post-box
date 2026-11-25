@@ -7,7 +7,7 @@ import { TableView, timeText } from "@/components/participant/entry-view";
 import type { Detail, Act } from "./types";
 import type { TableData } from "@/components/participant/types";
 
-interface E { reactions?: { total: number; byType: Record<string, number> }; id: string; groupId: string; stageId: string; questionId: string | null; choice?: string | null; authorId: string; authorName: string; kind: "text" | "table"; body: string; tags: string[]; table: TableData | null; attachmentId: string | null; version: number; updatedAt: number; hidden: boolean }
+interface E { reactions?: { total: number; byType: Record<string, number> }; id: string; groupId: string; stageId: string; questionId: string | null; choice?: string | null; authorId: string; authorName: string; kind: "text" | "table"; body: string; tags: string[]; table: TableData | null; attachmentId: string | null; version: number; updatedAt: number; hidden: boolean; submittedAt?: number | null }
 
 export function ContributionsTab({ d, act }: { d: Detail; act: Act }) {
   const [stageId, setStageId] = useState("");
@@ -25,6 +25,7 @@ export function ContributionsTab({ d, act }: { d: Detail; act: Act }) {
   useEffect(() => { void load(); const t = setInterval(load, 6000); return () => clearInterval(t); }, [load]);
   const gname = (id: string) => d.groups.find((g) => g.id === id)?.name ?? "?";
   const sname = (id: string) => d.stages.find((s) => s.id === id)?.title ?? "?";
+  const individualStage = (id: string) => d.stages.find((s) => s.id === id)?.submitMode === "individual";
 
   return (
     <div>
@@ -43,9 +44,10 @@ export function ContributionsTab({ d, act }: { d: Detail; act: Act }) {
             <li key={e.id}>
               <Card as="div">
                 <div className="mb-1 flex flex-wrap items-center justify-between gap-2 text-sm">
-                  <span><strong>{e.authorName}</strong> · {gname(e.groupId)} · {sname(e.stageId)} · {timeText(e.updatedAt)} · version {e.version} {e.reactions && e.reactions.total > 0 && <Badge>{e.reactions.total} reactions</Badge>} {e.hidden && <Badge tone="red">Hidden from group</Badge>}</span>
+                  <span><strong>{e.authorName}</strong> · {gname(e.groupId)} · {sname(e.stageId)} · {timeText(e.updatedAt)} · version {e.version} {e.reactions && e.reactions.total > 0 && <Badge>{e.reactions.total} reactions</Badge>} {e.hidden && <Badge tone="red">Hidden from group</Badge>} {individualStage(e.stageId) && (e.submittedAt ? <Badge tone="green">Submitted</Badge> : <Badge tone="amber">Draft, not submitted</Badge>)}</span>
                   <span className="flex flex-wrap gap-2">
                     <Button variant="secondary" disabled={d.session.status === "archived" || e.hidden} onClick={() => { if (confirm("Share this entry with the whole class? It becomes a frozen copy. Check the text for anything that could identify someone.")) void act(() => api("POST", `/sessions/${d.session.id}/publications`, { sourceType: "entry", sourceId: e.id, labelMode: d.session.anonymiseDefault ? "anonymous" : "group" }), "Shared with the class. Manage it on the Sharing tab."); }}>Share with class</Button>
+                    {individualStage(e.stageId) && e.submittedAt && <Button variant="secondary" disabled={d.session.status === "archived"} onClick={() => { if (confirm(`Return this answer to ${e.authorName} so they can change it? It stops counting in the class results until they submit it again.`)) void act(() => api("POST", `/entries/${e.id}/return`, {}), "Answer returned. The participant can change it and submit again.").then(load); }}>Return to participant</Button>}
                     <Button variant="secondary" disabled={d.session.status === "archived"} onClick={() => void act(() => api("POST", `/entries/${e.id}/hide`, { hidden: !e.hidden }), e.hidden ? "Entry is visible to the group again." : "Entry hidden from the group.").then(load)}>{e.hidden ? "Show to group again" : "Hide from group"}</Button>
                   </span>
                 </div>

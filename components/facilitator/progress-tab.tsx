@@ -6,8 +6,8 @@ import type { Detail, Act } from "./types";
 
 interface Overview {
   groups: { id: string; name: string; members: number }[];
-  stages: { id: string; title: string; position: number; enabled: boolean; availability: string; expected: number; submitted: number; missing: { id: string; name: string }[] }[];
-  cells: { groupId: string; stageId: string; status: "draft" | "submitted" | "reopened"; revision: number; submittedAt: number | null; submittedByName: string | null; entryCount: number; excluded: boolean; empty: boolean; expected: boolean }[];
+  stages: { id: string; title: string; position: number; enabled: boolean; availability: string; expected: number; submitted: number; missing: { id: string; name: string }[]; submitMode?: "group" | "individual"; individual?: { submittedAnswers: number; draftAnswers: number; people: number } }[];
+  cells: { groupId: string; stageId: string; status: "draft" | "submitted" | "reopened"; revision: number; submittedAt: number | null; submittedByName: string | null; entryCount: number; submittedAnswers?: number; excluded: boolean; empty: boolean; expected: boolean }[];
 }
 interface Snap { id: string; groupId: string; stageId: string; revision: number; submittedBy: string; submittedAt: number; reopenedAt: number | null; reopenNote: string | null; snapshot: { entries: { authorName: string; choice?: string | null; body: string; tags: string[]; table: { columns: string[]; rows: string[][] } | null; questionText: string | null }[]; synthesis: { body: string } | null } | null }
 
@@ -50,9 +50,14 @@ export function ProgressTab({ d, act }: { d: Detail; act: Act }) {
         {enabledStages.map((s, i) => (
           <Card key={s.id} as="div">
             <h2 className="font-semibold">{s.title}</h2>
-            <p className="mt-1 text-2xl font-bold" aria-label={`${s.submitted} of ${s.expected} expected groups have submitted`}>{s.submitted} of {s.expected} <span className="text-base font-normal">groups submitted</span></p>
+            {s.submitMode === "individual" && s.individual ? (
+              <>
+                <p className="mt-1 text-2xl font-bold">{s.individual.submittedAnswers} <span className="text-base font-normal">{s.individual.submittedAnswers === 1 ? "answer" : "answers"} submitted by {s.individual.people} {s.individual.people === 1 ? "person" : "people"}</span></p>
+                <p className="text-sm text-slate-700">{s.individual.draftAnswers} saved as {s.individual.draftAnswers === 1 ? "a draft" : "drafts"}. Each person submits each answer on its own.</p>
+              </>
+            ) : <p className="mt-1 text-2xl font-bold" aria-label={`${s.submitted} of ${s.expected} expected groups have submitted`}>{s.submitted} of {s.expected} <span className="text-base font-normal">groups submitted</span></p>}
             <p className="mt-1 text-sm"><Badge tone={s.availability === "open" ? "green" : s.availability === "closed" ? "amber" : "gray"}>{s.availability === "open" ? "Open" : s.availability === "closed" ? "Closed" : "Locked"}</Badge></p>
-            {s.missing.length > 0 && <p className="mt-2 text-sm">Waiting for: {s.missing.map((m) => m.name).join(", ")}</p>}
+            {s.submitMode !== "individual" && s.missing.length > 0 && <p className="mt-2 text-sm">Waiting for: {s.missing.map((m) => m.name).join(", ")}</p>}
             {i > 0 && s.availability === "locked" && <div className="mt-3"><Button disabled={!live} onClick={() => void openStage(s.id, s.title)}>Open {s.title}</Button></div>}
           </Card>
         ))}
@@ -71,7 +76,7 @@ export function ProgressTab({ d, act }: { d: Detail; act: Act }) {
                     const c = ov.cells.find((x) => x.groupId === g.id && x.stageId === s.id)!;
                     return (
                       <td key={s.id} className="p-2">
-                        {c.excluded ? <Badge>Left out</Badge> : c.empty ? <Badge>No members</Badge> : <Badge tone={c.status === "submitted" ? "green" : c.status === "reopened" ? "amber" : "gray"}>{STATUS[c.status]}{c.revision > 0 ? ` · version ${c.revision}` : ""}</Badge>}
+                        {c.excluded ? <Badge>Left out</Badge> : c.empty ? <Badge>No members</Badge> : s.submitMode === "individual" ? <Badge tone={c.submittedAnswers ? "green" : "gray"}>{c.submittedAnswers ?? 0} answers submitted</Badge> : <Badge tone={c.status === "submitted" ? "green" : c.status === "reopened" ? "amber" : "gray"}>{STATUS[c.status]}{c.revision > 0 ? ` · version ${c.revision}` : ""}</Badge>}
                         <p className="mt-1">{c.entryCount} entries</p>
                         {c.submittedByName && <p className="text-xs">by {c.submittedByName}</p>}
                         <div className="mt-1 flex flex-wrap gap-1">
