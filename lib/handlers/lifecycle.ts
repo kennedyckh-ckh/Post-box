@@ -45,7 +45,7 @@ route("POST", "/sessions/:id/duplicate", (ctx) => {
           if (q.parent_id && !parent) continue; // sub-question of a removed question
           const nq = newId("que");
           qMap.set(str(q.id), nq);
-          run("INSERT INTO stage_questions(id,stage_id,position,text,required,visible,parent_id,heading) VALUES(?,?,?,?,?,?,?,?)", nq, nid, num(q.position), str(q.text), num(q.required), q.visible === undefined ? 1 : num(q.visible), parent ?? null, str(q.heading ?? ""));
+          run("INSERT INTO stage_questions(id,stage_id,position,text,required,visible,parent_id,heading,options_json) VALUES(?,?,?,?,?,?,?,?,?)", nq, nid, num(q.position), str(q.text), num(q.required), q.visible === undefined ? 1 : num(q.visible), parent ?? null, str(q.heading ?? ""), str(q.options_json ?? "[]"));
         }
         for (const r of all("SELECT * FROM stage_resources WHERE stage_id=? ORDER BY position", str(st.id))) {
           if (r.kind === "link") {

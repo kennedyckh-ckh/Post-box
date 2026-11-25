@@ -8,9 +8,11 @@ import { useRemaining, fmt, type TimerView } from "@/components/timer";
 
 interface PStage {
   id: string; position: number; title: string; visible: boolean; availability: "locked" | "open" | "closed"; instructions: string;
-  questions: { id: string; heading?: string; text: string; required: boolean; parentId: string | null }[]; hiddenQuestions: number;
+  questions: { id: string; heading?: string; text: string; required: boolean; parentId: string | null; options?: string[] }[]; hiddenQuestions: number;
+  tallies?: PTally[];
   expected: number; submitted: number; perGroup: { groupId: string; status: "draft" | "submitted" | "reopened"; entries: number; expected: boolean }[];
 }
+interface PTally { questionId: string; options: { label: string; count: number }[]; other: number; total: number }
 interface Feed {
   title: string; status: string; joinCode: string; joiningOpen: boolean; participants: number;
   groups: { id: string; name: string; members: number }[];
@@ -62,6 +64,8 @@ export default function ProjectorPage({ params }: { params: Promise<{ id: string
   const [dock, setDock] = useState(true);
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState("");
+  // Class results (for example how many agree and disagree with each statement) are shown only when the facilitator asks.
+  const [showResults, setShowResults] = useState(false);
   const [origin, setOrigin] = useState("");
   const idle = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seen = useRef<Set<string> | null>(null);
@@ -141,6 +145,7 @@ export default function ProjectorPage({ params }: { params: Promise<{ id: string
         if (e.key === "ArrowRight") moveStage(1);
         if (e.key === "ArrowLeft") moveStage(-1);
         if (mode === "questions" && (e.key === "r" || e.key === "R" || e.key === " ")) { e.preventDefault(); void reveal("next"); }
+        if (mode === "questions" && (e.key === "v" || e.key === "V")) setShowResults((x) => !x);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -207,6 +212,8 @@ export default function ProjectorPage({ params }: { params: Promise<{ id: string
                   <StageHeading stage={stage} index={stages.findIndex((s) => s.id === stage.id)} total={stages.length} />
                   {stage.questions.length === 0 ? (
                     <Empty title={stage.hiddenQuestions ? "Questions are ready to reveal" : "No guiding questions in this part"} text={stage.hiddenQuestions ? `${stage.hiddenQuestions} ${stage.hiddenQuestions === 1 ? "question is" : "questions are"} waiting. Press “Reveal next question” or R.` : "Add questions in the Parts tab of the session page."} />
+                  ) : showResults && (stage.tallies?.length ?? 0) > 0 ? (
+                    <ClassResults stage={stage} />
                   ) : (
                     <ol className="mt-[4vh] space-y-[2.6vh]">
                       {stage.questions.filter((q) => !q.parentId).map((q, i) => {
@@ -218,6 +225,7 @@ export default function ProjectorPage({ params }: { params: Promise<{ id: string
                               <div>
                                 {q.heading && <p className="mb-1 text-[clamp(0.9rem,1.3vw,1.35rem)] font-semibold uppercase tracking-[0.18em] text-[#e8b384]">{q.heading}</p>}
                                 <p className="text-[clamp(1.6rem,3vw,3.2rem)] leading-tight text-white">{q.text}</p>
+                                {q.options && q.options.length > 0 && <p className="mt-2 flex flex-wrap gap-2">{q.options.map((o) => <span key={o} className="rounded-full bg-white/10 px-3 py-0.5 text-[clamp(0.9rem,1.2vw,1.3rem)] font-semibold text-white/80 ring-1 ring-white/15">{o}</span>)}</p>}
                               </div>
                             </div>
                             {subs.length > 0 && (
@@ -338,6 +346,11 @@ export default function ProjectorPage({ params }: { params: Promise<{ id: string
               <DockBtn label="Hide all questions" onClick={() => { if (confirm("Hide all questions of this part from participants? Answers already written are kept.")) void reveal("none"); }} disabled={busy || stage.questions.length === 0}>Hide all</DockBtn>
             </div>
           )}
+          {mode === "questions" && stage && (stage.tallies?.length ?? 0) > 0 && (
+            <div className="flex items-center gap-1 border-l border-white/10 pl-2">
+              <button type="button" aria-pressed={showResults} title="Show or hide the class results (V)" onClick={() => setShowResults((x) => !x)} className={`min-h-10 rounded-xl px-4 text-sm font-semibold transition ${showResults ? "bg-white text-[#0c1a20] hover:bg-white/90" : "bg-[#9fd0cb] text-[#0c1a20] hover:bg-[#c4e4e0]"}`}>{showResults ? "Back to questions" : "Show class results"}</button>
+            </div>
+          )}
           {mode === "shared" && items.length > 1 && (
             <div className="flex items-center gap-1 border-l border-white/10 pl-2">
               <DockBtn label="Previous item" onClick={() => setItemIdx((i) => Math.max(0, i - 1))} disabled={itemIdx === 0}>←</DockBtn>
@@ -357,6 +370,56 @@ export default function ProjectorPage({ params }: { params: Promise<{ id: string
         </div>
       </nav>
     </main>
+  );
+}
+
+/**
+ * Class results for a part: for each revealed statement with options (for example Agree / Disagree), the exact number of
+ * people who chose each option, as large bars for the room. Counts only: no names and no reasons.
+ */
+function ClassResults({ stage }: { stage: PStage }) {
+  const tallies = stage.tallies ?? [];
+  const mains = stage.questions.filter((q) => !q.parentId);
+  const label = (qid: string) => {
+    const q = stage.questions.find((x) => x.id === qid);
+    if (!q) return { n: "", heading: "", text: "" };
+    if (!q.parentId) { const i = mains.findIndex((m) => m.id === qid); return { n: String(i + 1), heading: q.heading ?? "", text: q.text }; }
+    const i = mains.findIndex((m) => m.id === q.parentId);
+    const k = stage.questions.filter((x) => x.parentId === q.parentId).findIndex((x) => x.id === qid);
+    return { n: `${i + 1}${String.fromCharCode(97 + k)}`, heading: "", text: q.text };
+  };
+  const palette = ["#9fd0cb", "#e8b384", "#c3b6f2", "#f2a7b5", "#b7d98b", "#f3d2b3"];
+  const dense = tallies.length > 3;
+  return (
+    <div className="mt-[3vh]">
+      <p className="mb-[2vh] text-[clamp(0.9rem,1.2vw,1.25rem)] font-semibold uppercase tracking-[0.2em] text-[#9fd0cb]">Class results</p>
+      <ul className={`grid gap-[2vw] ${dense ? "lg:grid-cols-2" : ""}`}>
+        {tallies.map((t) => {
+          const q = label(t.questionId);
+          return (
+            <li key={t.questionId} className="rounded-3xl bg-white/[0.07] p-[clamp(1rem,1.8vw,2rem)] ring-1 ring-white/10">
+              <div className="flex gap-[1vw]">
+                <span aria-hidden="true" className="flex h-[clamp(2rem,2.8vw,3rem)] w-[clamp(2rem,2.8vw,3rem)] shrink-0 items-center justify-center rounded-full bg-[#9fd0cb] font-display text-[clamp(1rem,1.5vw,1.6rem)] font-semibold text-[#0c1a20]">{q.n}</span>
+                <div className="min-w-0">
+                  {q.heading && <p className="text-[clamp(0.8rem,1vw,1.1rem)] font-semibold uppercase tracking-[0.18em] text-[#e8b384]">{q.heading}</p>}
+                  <p className={`leading-snug text-white ${dense ? "text-[clamp(1.1rem,1.6vw,1.8rem)]" : "text-[clamp(1.3rem,2.2vw,2.4rem)]"}`}>{q.text}</p>
+                </div>
+              </div>
+              <ul className="mt-[2vh] grid grid-cols-[max-content_1fr_max-content] items-center gap-x-[1vw] gap-y-[1.2vh]">
+                {t.options.map((o, i) => (
+                  <li key={o.label} className="contents">
+                    <span className="text-[clamp(1rem,1.4vw,1.6rem)] font-semibold text-white/90">{o.label}</span>
+                    <span className="h-[clamp(1rem,2.2vh,1.8rem)] overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full transition-all duration-700" style={{ width: `${t.total ? (o.count / t.total) * 100 : 0}%`, background: palette[i % palette.length] }} /></span>
+                    <span className="min-w-[5ch] text-right font-display text-[clamp(1.3rem,2vw,2.3rem)] font-semibold tabular-nums">{o.count}<span className="ml-2 text-[clamp(0.85rem,1.1vw,1.2rem)] font-normal text-white/60">{t.total ? `${Math.round((o.count / t.total) * 100)}%` : "0%"}</span></span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-[1.6vh] text-[clamp(0.85rem,1.1vw,1.2rem)] text-white/60">{t.total} {t.total === 1 ? "response" : "responses"}{t.other > 0 ? ` · ${t.other} under earlier options` : ""}</p>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 

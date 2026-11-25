@@ -4,7 +4,7 @@ import { api, errText, ApiError } from "@/lib/client/api";
 import { uploadFile } from "@/lib/client/upload";
 import { Button, Alert, Field, inputCls } from "@/components/ui";
 import { TableEditor } from "./table-editor";
-import { EntryBody } from "./entry-view";
+import { EntryBody, ChoiceBadge } from "./entry-view";
 import type { Entry, StageDetail, SaveState, TableData } from "./types";
 
 const newTable = (): TableData => ({ columns: ["Column 1", "Column 2"], rows: [["", ""]] });
@@ -12,12 +12,14 @@ const newTable = (): TableData => ({ columns: ["Column 1", "Column 2"], rows: [[
 interface Props {
   detail: StageDetail;
   editing: Entry | null;
+  /** For a new entry: the question it answers (for example from an "Answer" button next to a statement). */
+  presetQuestionId?: string | null;
   onDone: () => void;
   onState: (s: SaveState, msg?: string) => void;
 }
 
 /** Create or edit one of your own entries. It says "saved" only after the server confirms. */
-export function EntryEditor({ detail, editing, onDone, onState }: Props) {
+export function EntryEditor({ detail, editing, presetQuestionId, onDone, onState }: Props) {
   const st = detail.stage;
   const canTable = st.contributionTypes.includes("table");
   const canText = st.contributionTypes.includes("text");
@@ -25,7 +27,12 @@ export function EntryEditor({ detail, editing, onDone, onState }: Props) {
   const [kind, setKind] = useState<"text" | "table">(editing?.kind ?? (canText ? "text" : "table"));
   const [body, setBody] = useState(editing?.body ?? "");
   const [tags, setTags] = useState<string[]>(editing?.tags ?? []);
-  const [questionId, setQuestionId] = useState(editing?.questionId ?? "");
+  const [questionId, setQuestionId] = useState(editing?.questionId ?? presetQuestionId ?? "");
+  const [choice, setChoice] = useState<string>(editing?.choice ?? "");
+  // A question with response options (for example Agree / Disagree): choose one, then the text is the reason.
+  const options = detail.questions.find((q) => q.id === questionId)?.options ?? [];
+  const isChoice = options.length > 0;
+  const choiceOk = !isChoice || options.includes(choice);
   const [table, setTable] = useState<TableData>(editing?.table ?? newTable());
   const [attachment, setAttachment] = useState<Entry["attachment"]>(editing?.attachment ?? null);
   const [base, setBase] = useState(editing?.version ?? 0);
@@ -44,7 +51,7 @@ export function EntryEditor({ detail, editing, onDone, onState }: Props) {
 
   async function save(overrideBase?: number) {
     setBusy(true); setError(""); onState("saving");
-    const payload = { kind, body, tags, questionId: questionId || null, table: kind === "table" ? table : undefined, attachmentId: attachment?.id ?? null };
+    const payload = { kind, body, tags, questionId: questionId || null, choice: isChoice ? choice : null, table: kind === "table" ? table : undefined, attachmentId: attachment?.id ?? null };
     try {
       if (editing) await api("PATCH", `/entries/${editing.id}`, { ...payload, baseVersion: overrideBase ?? base });
       else await api("POST", `/stages/${st.id}/entries`, { ...payload, clientKey: key.current });
@@ -82,7 +89,7 @@ export function EntryEditor({ detail, editing, onDone, onState }: Props) {
 
   return (
     <form className="rounded-xl border-2 border-brand bg-white p-4" onSubmit={(e) => { e.preventDefault(); void save(); }} aria-label={editing ? "Edit your entry" : "Add an entry"}>
-      <h3 className="mb-3 text-lg font-semibold">{editing ? "Edit your entry" : "Add an entry"}</h3>
+      <h3 className="mb-3 text-lg font-semibold">{isChoice ? (editing ? "Change your answer" : "Your answer") : editing ? "Edit your entry" : "Add an entry"}</h3>
       {error && <Alert kind="error">{error}</Alert>}
       {conflict && (
         <div className="mb-4 rounded-lg border border-amber-700 bg-amber-50 p-3" role="group" aria-label="Edit conflict">
@@ -92,7 +99,7 @@ export function EntryEditor({ detail, editing, onDone, onState }: Props) {
           <p className="text-sm">Your version is still in the form below. Choose what to do:</p>
           <div className="mt-2 flex flex-wrap gap-2">
             <Button onClick={() => { setBase(conflict.version); void save(conflict.version); }}>Save my version over it</Button>
-            <Button variant="secondary" onClick={() => { setBody(conflict.body); setTags(conflict.tags); if (conflict.table) setTable(conflict.table); setBase(conflict.version); setConflict(null); setError(""); onState("unsaved"); }}>Use the saved version instead</Button>
+            <Button variant="secondary" onClick={() => { setBody(conflict.body); setTags(conflict.tags); setChoice(conflict.choice ?? ""); if (conflict.table) setTable(conflict.table); setBase(conflict.version); setConflict(null); setError(""); onState("unsaved"); }}>Use the saved version instead</Button>
           </div>
         </div>
       )}
@@ -105,10 +112,24 @@ export function EntryEditor({ detail, editing, onDone, onState }: Props) {
       )}
       {detail.questions.length > 0 && (
         <Field label="Which question is this for? (optional)">
-          {(id) => <select id={id} className={inputCls} value={questionId} onChange={(e) => { setQuestionId(e.target.value); touch(); }}><option value="">General</option>{questionOptions(detail.questions).map((q) => <option key={q.id} value={q.id}>{q.label}. {q.text}</option>)}</select>}
+          {(id) => <select id={id} className={inputCls} value={questionId} onChange={(e) => { setQuestionId(e.target.value); setChoice(""); touch(); }}><option value="">General</option>{questionOptions(detail.questions).map((q) => <option key={q.id} value={q.id}>{q.label}. {q.text}</option>)}</select>}
         </Field>
       )}
-      <Field label={kind === "text" ? "Your contribution" : "Caption (optional)"} hint="Your name is shown with your entry. Only your group can see it until your facilitator shares it.">
+      {isChoice && (
+        <fieldset className="mb-4">
+          <legend className="mb-2 text-sm font-semibold">Your judgement <span className="font-normal text-muted">(choose one)</span></legend>
+          <div className="flex flex-wrap gap-2">
+            {options.map((o) => (
+              <label key={o} className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border-2 px-4 font-semibold transition ${choice === o ? "border-brand-strong bg-brand-strong text-white" : "border-line bg-white text-ink hover:border-brand"}`}>
+                <input type="radio" name={`choice-${questionId}`} className="sr-only" checked={choice === o} onChange={() => { setChoice(o); touch(); }} />
+                {o}
+              </label>
+            ))}
+          </div>
+          {choice && !options.includes(choice) && <p className="mt-2 text-sm text-amber-800">Your earlier choice <ChoiceBadge choice={choice} /> is no longer one of the options. Choose again.</p>}
+        </fieldset>
+      )}
+      <Field label={isChoice ? "Your reason" : kind === "text" ? "Your contribution" : "Caption (optional)"} hint={isChoice ? "Explain why you chose this. Your group sees your name and reason; the class sees only the totals unless your facilitator shares your answer." : "Your name is shown with your entry. Only your group can see it until your facilitator shares it."}>
         {(id, d) => <textarea id={id} aria-describedby={d} className={`${inputCls} min-h-28`} maxLength={kind === "text" ? 4000 : 500} value={body} onChange={(e) => { setBody(e.target.value); touch(); }} />}
       </Field>
       {kind === "table" && <TableEditor value={table} onChange={(t) => { setTable(t); touch(); }} />}
@@ -132,7 +153,7 @@ export function EntryEditor({ detail, editing, onDone, onState }: Props) {
         </div>
       )}
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" disabled={busy || (kind === "text" && !body.trim())}>{busy ? "Saving…" : "Save entry"}</Button>
+        <Button type="submit" disabled={busy || !choiceOk || (kind === "text" && !body.trim())}>{busy ? "Saving…" : isChoice ? "Save my answer" : "Save entry"}</Button>
         <Button variant="secondary" disabled={busy} onClick={() => { if (!dirty.current || confirm("Discard your changes to this entry?")) { dirty.current = false; onState("idle"); onDone(); } }}>Cancel</Button>
       </div>
     </form>

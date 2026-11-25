@@ -458,4 +458,15 @@ CREATE TABLE session_timers(
 ALTER TABLE stage_questions ADD COLUMN heading TEXT NOT NULL DEFAULT '';
 `,
   },
+  {
+    id: "009_question_response_options",
+    sql: `
+-- A question can ask participants to choose one of the facilitator's options (for example Agree / Disagree) and give a
+-- reason. An empty list means an open answer, as before. The chosen option is kept on the entry and in its versions.
+ALTER TABLE stage_questions ADD COLUMN options_json TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE entries ADD COLUMN choice TEXT;
+ALTER TABLE entry_versions ADD COLUMN choice TEXT;
+CREATE INDEX idx_entries_question_choice ON entries(question_id, choice);
+`,
+  },
 ];

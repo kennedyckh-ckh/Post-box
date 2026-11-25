@@ -51,3 +51,24 @@ export const parseJson = <T>(s: unknown, fallback: T): T => {
     return fallback;
   }
 };
+
+/**
+ * Response options for a question, such as ["Agree", "Disagree"]. An empty list means an open answer.
+ * Otherwise 2 to 6 distinct, short labels.
+ */
+export const OPTION_LIMITS = { min: 2, max: 6, label: 40 };
+export function cleanOptions(v: unknown): string[] {
+  if (v === undefined || v === null) return [];
+  if (!Array.isArray(v)) throw badRequest("Response options must be a list.");
+  const out: string[] = [];
+  for (const o of v) {
+    const s = text(o, "Response option", { max: OPTION_LIMITS.label, optional: true }).trim();
+    if (!s) continue;
+    if (out.some((x) => x.toLowerCase() === s.toLowerCase())) throw badRequest(`"${s}" is listed twice. Each response option must be different.`);
+    out.push(s);
+  }
+  if (out.length === 0) return [];
+  if (out.length < OPTION_LIMITS.min) throw badRequest("Give at least two response options (for example Agree and Disagree), or none for an open answer.");
+  if (out.length > OPTION_LIMITS.max) throw badRequest(`Give at most ${OPTION_LIMITS.max} response options.`);
+  return out;
+}

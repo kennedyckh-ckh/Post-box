@@ -5,7 +5,7 @@ import { ParticipantTimer } from "@/components/timer";
 import { api, errText, ApiError } from "@/lib/client/api";
 import { Shell, Card, Button, Alert, Badge, inputCls, LogoffButton } from "@/components/ui";
 import { EntryEditor } from "@/components/participant/entry-editor";
-import { EntryBody, timeText } from "@/components/participant/entry-view";
+import { EntryBody, ChoiceBadge, timeText } from "@/components/participant/entry-view";
 import { SubmitPanel } from "@/components/participant/submit-panel";
 import { ReactionBar, CommentList, CommentBox } from "@/components/participant/engagement";
 import type { Entry, EntryList, SaveState, StageDetail } from "@/components/participant/types";
@@ -26,6 +26,7 @@ export default function StagePage({ params }: { params: Promise<{ id: string }> 
   const [error, setError] = useState("");
   const [offline, setOffline] = useState(false);
   const [editing, setEditing] = useState<Entry | "new" | null>(null);
+  const [presetQ, setPresetQ] = useState<string | null>(null);
   const [save, setSave] = useState<{ s: SaveState; msg?: string }>({ s: "idle" });
   const etag = useRef("");
   const editingRef = useRef(false);
@@ -77,6 +78,24 @@ export default function StagePage({ params }: { params: Promise<{ id: string }> 
   if (!detail || !list) return <Shell title="Loading…"><p role="status">Loading…</p></Shell>;
   const st = detail.stage;
   const canWrite = list.canWrite;
+  // Questions with response options (for example Agree / Disagree): each person answers once and can change their answer.
+  const myAnswer = (qid: string) => list.entries.find((e) => e.mine && e.questionId === qid && e.choice);
+  const answer = (qid: string) => {
+    const mine = myAnswer(qid);
+    setSave({ s: "idle" });
+    if (mine) { setPresetQ(null); setEditing(mine); } else { setPresetQ(qid); setEditing("new"); }
+    setTimeout(() => document.getElementById("entry-editor")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  };
+  const AnswerControl = ({ q, label }: { q: { id: string; options?: string[] }; label: string }) => {
+    if (!q.options?.length) return null;
+    const mine = myAnswer(q.id);
+    return (
+      <span className="mt-1.5 flex flex-wrap items-center gap-2">
+        {mine ? <><span className="text-sm text-muted">Your answer:</span><ChoiceBadge choice={mine.choice!} /></> : <span className="text-sm text-muted">{q.options.join(" / ")}</span>}
+        {canWrite && editing === null && <Button variant={mine ? "secondary" : "primary"} aria-label={`${mine ? "Change your answer to" : "Answer"} ${label}`} onClick={() => answer(q.id)}>{mine ? "Change my answer" : "Answer"}</Button>}
+      </span>
+    );
+  };
 
   return (
     <Shell wide right={<LogoffButton />} banner={<ParticipantTimer />}>
@@ -107,6 +126,7 @@ export default function StagePage({ params }: { params: Promise<{ id: string }> 
                           <span className="pt-0.5 text-ink">
                             {q.heading && <span className="mb-0.5 block text-xs font-semibold uppercase tracking-[0.12em] text-accent">{q.heading}</span>}
                             <span className="sr-only">Question {i + 1}: </span>{q.text} {q.required && <Badge tone="amber">Required</Badge>}
+                            <AnswerControl q={q} label={q.heading || `question ${i + 1}`} />
                           </span>
                         </div>
                         {subs.length > 0 && (
@@ -114,7 +134,7 @@ export default function StagePage({ params }: { params: Promise<{ id: string }> 
                             {subs.map((sq, k) => (
                               <li key={sq.id} className="flex gap-2 text-ink">
                                 <span className="w-6 shrink-0 font-semibold text-brand" aria-hidden="true">{String.fromCharCode(97 + k)}.</span>
-                                <span><span className="sr-only">Question {i + 1}{String.fromCharCode(97 + k)}: </span>{sq.text} {sq.required && <Badge tone="amber">Required</Badge>}</span>
+                                <span><span className="sr-only">Question {i + 1}{String.fromCharCode(97 + k)}: </span>{sq.text} {sq.required && <Badge tone="amber">Required</Badge>}<AnswerControl q={sq} label={`question ${i + 1}${String.fromCharCode(97 + k)}`} /></span>
                               </li>
                             ))}
                           </ol>
@@ -144,9 +164,9 @@ export default function StagePage({ params }: { params: Promise<{ id: string }> 
           <section aria-label="Your group's entries">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-xl font-semibold">Your group's entries <Badge>{list.entries.length}</Badge></h2>
-              {canWrite && editing === null && <Button onClick={() => { setEditing("new"); setSave({ s: "idle" }); }}>Add an entry</Button>}
+              {canWrite && editing === null && <Button onClick={() => { setPresetQ(null); setEditing("new"); setSave({ s: "idle" }); }}>Add an entry</Button>}
             </div>
-            {editing !== null && <div className="mb-4"><EntryEditor key={editing === "new" ? "new" : editing.id + editing.version} detail={detail} editing={editing === "new" ? null : editing} onState={(s, msg) => setSave({ s, msg })} onDone={() => { setEditing(null); void poll(true); }} /></div>}
+            {editing !== null && <div className="mb-4 scroll-mt-4" id="entry-editor"><EntryEditor key={editing === "new" ? `new-${presetQ ?? ""}` : editing.id + editing.version} detail={detail} editing={editing === "new" ? null : editing} presetQuestionId={editing === "new" ? presetQ : null} onState={(s, msg) => setSave({ s, msg })} onDone={() => { setEditing(null); void poll(true); }} /></div>}
             {list.entries.length === 0 ? <Card><p>No entries yet. Be the first to add one.</p></Card> : (
               <ul className="space-y-3">
                 {list.entries.map((e) => (

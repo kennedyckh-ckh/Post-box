@@ -2,7 +2,7 @@
 
 export interface ProjectorItem {
   id: string; label: string; kind: string; stageTitle: string;
-  entries: { questionText: string | null; kind: string; body: string; tags: string[]; table: { columns: string[]; rows: string[][] } | null; attachmentId: string | null }[];
+  entries: { questionText: string | null; choice?: string | null; kind: string; body: string; tags: string[]; table: { columns: string[]; rows: string[][] } | null; attachmentId: string | null }[];
   synthesis: string | null;
 }
 
@@ -17,6 +17,7 @@ export function ProjectorItemView({ it, imageSrc, size = "lg" }: { it: Projector
         {it.entries.map((e, i) => (
           <div key={i}>
             {e.questionText && <p className="mb-2 text-[clamp(1rem,1.4vw,1.5rem)] font-semibold text-white/60">{e.questionText}</p>}
+            {e.choice && <p className="mb-2"><span className="inline-block rounded-full bg-[#9fd0cb] px-4 py-1 text-[clamp(1rem,1.5vw,1.6rem)] font-semibold text-[#0c1a20]">{e.choice}</span></p>}
             {e.body && <p className={`whitespace-pre-wrap break-words leading-snug text-white ${body}`}>{e.body}</p>}
             {e.table && (
               <div className="mt-3 overflow-x-auto">

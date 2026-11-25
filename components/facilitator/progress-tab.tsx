@@ -9,7 +9,7 @@ interface Overview {
   stages: { id: string; title: string; position: number; enabled: boolean; availability: string; expected: number; submitted: number; missing: { id: string; name: string }[] }[];
   cells: { groupId: string; stageId: string; status: "draft" | "submitted" | "reopened"; revision: number; submittedAt: number | null; submittedByName: string | null; entryCount: number; excluded: boolean; empty: boolean; expected: boolean }[];
 }
-interface Snap { id: string; groupId: string; stageId: string; revision: number; submittedBy: string; submittedAt: number; reopenedAt: number | null; reopenNote: string | null; snapshot: { entries: { authorName: string; body: string; tags: string[]; table: { columns: string[]; rows: string[][] } | null; questionText: string | null }[]; synthesis: { body: string } | null } | null }
+interface Snap { id: string; groupId: string; stageId: string; revision: number; submittedBy: string; submittedAt: number; reopenedAt: number | null; reopenNote: string | null; snapshot: { entries: { authorName: string; choice?: string | null; body: string; tags: string[]; table: { columns: string[]; rows: string[][] } | null; questionText: string | null }[]; synthesis: { body: string } | null } | null }
 
 const STATUS = { draft: "Draft", submitted: "Submitted", reopened: "Reopened (being revised)" } as const;
 
@@ -95,7 +95,7 @@ export function ProgressTab({ d, act }: { d: Detail; act: Act }) {
               <summary className="cursor-pointer font-semibold">Version {v.revision} · submitted by {v.submittedBy} · {new Date(v.submittedAt).toLocaleString()} {v.reopenedAt && <Badge tone="amber">Reopened {new Date(v.reopenedAt).toLocaleString()}{v.reopenNote ? `: ${v.reopenNote}` : ""}</Badge>}</summary>
               <div className="mt-2"><Button variant="secondary" disabled={archived} onClick={() => { if (confirm(`Share version ${v.revision} with the whole class? It becomes a frozen copy. Check the text for anything that could identify someone.`)) void run(() => api("POST", `/sessions/${d.session.id}/publications`, { sourceType: "submission", sourceId: v.id, labelMode: d.session.anonymiseDefault ? "anonymous" : "group" }), "Shared with the class. Manage it on the Sharing tab."); }}>Share this version with the class</Button></div>
               <ul className="mt-2 space-y-2 text-sm">
-                {v.snapshot?.entries.map((e, i) => <li key={i} className="rounded bg-slate-50 p-2"><strong>{e.authorName}</strong>{e.questionText && <> · re: {e.questionText}</>}: {e.body}{e.table && <> [table: {e.table.columns.join(", ")}; {e.table.rows.length} rows]</>}{e.tags.length > 0 && <> · {e.tags.join(", ")}</>}</li>)}
+                {v.snapshot?.entries.map((e, i) => <li key={i} className="rounded bg-slate-50 p-2"><strong>{e.authorName}</strong>{e.questionText && <> · re: {e.questionText}</>}: {e.choice && <strong>[{e.choice}] </strong>}{e.body}{e.table && <> [table: {e.table.columns.join(", ")}; {e.table.rows.length} rows]</>}{e.tags.length > 0 && <> · {e.tags.join(", ")}</>}</li>)}
                 {v.snapshot?.synthesis?.body && <li className="rounded bg-brand-soft p-2"><strong>Group response:</strong> {v.snapshot.synthesis.body}</li>}
               </ul>
             </details>

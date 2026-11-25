@@ -39,6 +39,8 @@ export interface SnapEntry {
   authorName: string;
   questionId: string | null;
   questionText: string | null;
+  /** The option chosen, for questions with response options (for example "Agree"); absent in older snapshots. */
+  choice?: string | null;
   kind: string;
   body: string;
   tags: string[];
@@ -66,7 +68,7 @@ export function buildSnapshot(groupId: string, stageId: string, now: number): Sn
     const att = e.attachment_id ? get("SELECT id,original_name,mime FROM attachments WHERE id=? AND deleted_at IS NULL", str(e.attachment_id)) : undefined;
     return {
       id: str(e.id), authorId: str(e.author_id), authorName: str(e.author_name), questionId: e.question_id ? str(e.question_id) : null, questionText: e.question_id ? qText.get(str(e.question_id)) ?? null : null,
-      kind: str(e.kind), body: str(e.body), tags: parseJson<string[]>(e.tags_json, []), table: e.table_json ? parseJson(e.table_json, null) : null,
+      choice: e.choice ? str(e.choice) : null, kind: str(e.kind), body: str(e.body), tags: parseJson<string[]>(e.tags_json, []), table: e.table_json ? parseJson(e.table_json, null) : null,
       attachment: att ? { id: str(att.id), name: str(att.original_name), mime: str(att.mime) } : null, version: num(e.version), createdAt: num(e.created_at), updatedAt: num(e.updated_at),
     };
   });

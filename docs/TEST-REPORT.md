@@ -21,6 +21,8 @@ Commands: `npm test` (120 tests), `npm run typecheck`, `npm run lint`, `npm run 
 Tests per file: `foundations` 23, `workspace` 23, `submission` 12, `sharing` 20, `ai` 30, `hardening` 11, `race` 1.
 **Real defects found while testing, now fixed:** a rejected AI edit or publication surfaced as a server error instead of a clear message; one AI lookup answered “not found” before checking sign-in (found by the every-endpoint test); the clean-checkout build failed when the machine's `NODE_ENV` was not `production` (found by the deployment rehearsal, not by a test); and two screens overflowed a phone-width screen (found by the phone check). Other first-run test failures were mistakes in the tests themselves (for example test text that contained an author's name) and were corrected in the tests.
 
+**Post-box update:** `tests/postbox.test.ts` (3 tests) covers the Post-box template, required choice with an option from the facilitator's list, one answer per person per statement, changing an answer, class counts by option and by group, hidden entries not counted, renamed options counted as “other”, projector counts for revealed statements only with no names or reasons, duplicating a session, and the choice kept in submissions and exports. Full suite at this update: 135 passed, 0 failed (`npm test`), plus typecheck, lint and build.
+
 ## 2. The brief's required scenarios (section 17) and the test that covers each
 
 | Required scenario | Test (file → title) | Kind |

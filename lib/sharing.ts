@@ -60,7 +60,7 @@ export interface PubContent {
   stageTitle: string;
   title?: string;
   /** shown to participants */
-  entries: { questionText: string | null; kind: string; body: string; tags: string[]; table: unknown; attachment: { id: string; mime: string } | null }[];
+  entries: { questionText: string | null; choice?: string | null; kind: string; body: string; tags: string[]; table: unknown; attachment: { id: string; mime: string } | null }[];
   synthesis: string | null;
   revision?: number;
   /** AI outputs carry structured content here (phase 5) */
@@ -97,7 +97,7 @@ export function buildContent(sessionId: string, type: string, id: string): { con
       version: `${num(e.version)}`, groupId: str(e.group_id), stageId: str(e.stage_id),
       content: {
         type: "entry", stageTitle: str(stage.title),
-        entries: [{ questionText: q ? str(q.text) : null, kind: str(e.kind), body: str(e.body), tags: parseJson<string[]>(e.tags_json, []), table: e.table_json ? parseJson(e.table_json, null) : null, attachment: att ? { id: str(att.id), mime: str(att.mime) } : null }],
+        entries: [{ questionText: q ? str(q.text) : null, choice: e.choice ? str(e.choice) : null, kind: str(e.kind), body: str(e.body), tags: parseJson<string[]>(e.tags_json, []), table: e.table_json ? parseJson(e.table_json, null) : null, attachment: att ? { id: str(att.id), mime: str(att.mime) } : null }],
         synthesis: null,
         internal: { groupName: group ? str(group.name) : null, groupId: str(e.group_id), authors: [{ id: str(e.author_id), name: str(e.author_name) }] },
       },
@@ -106,7 +106,7 @@ export function buildContent(sessionId: string, type: string, id: string): { con
   if (type === "submission") {
     const s = get("SELECT * FROM submissions WHERE id=? AND session_id=?", id, sessionId);
     if (!s) return null;
-    const snap = parseJson<{ stageTitle: string; entries: { authorId: string; authorName: string; questionText: string | null; kind: string; body: string; tags: string[]; table: unknown; attachment: { id: string; mime: string } | null }[]; synthesis: { body: string } | null }>(s.snapshot_json, { stageTitle: "", entries: [], synthesis: null });
+    const snap = parseJson<{ stageTitle: string; entries: { authorId: string; authorName: string; questionText: string | null; choice?: string | null; kind: string; body: string; tags: string[]; table: unknown; attachment: { id: string; mime: string } | null }[]; synthesis: { body: string } | null }>(s.snapshot_json, { stageTitle: "", entries: [], synthesis: null });
     const group = get("SELECT name FROM groups WHERE id=?", str(s.group_id));
     const authors = new Map<string, string>();
     for (const e of snap.entries) authors.set(e.authorId, e.authorName);
@@ -115,7 +115,7 @@ export function buildContent(sessionId: string, type: string, id: string): { con
       content: {
         type: "submission", stageTitle: snap.stageTitle, revision: num(s.revision),
         // author names are deliberately left out of the public part of a group submission
-        entries: snap.entries.map((e) => ({ questionText: e.questionText, kind: e.kind, body: e.body, tags: e.tags, table: e.table, attachment: e.attachment ? { id: e.attachment.id, mime: e.attachment.mime } : null })),
+        entries: snap.entries.map((e) => ({ questionText: e.questionText, choice: e.choice ?? null, kind: e.kind, body: e.body, tags: e.tags, table: e.table, attachment: e.attachment ? { id: e.attachment.id, mime: e.attachment.mime } : null })),
         synthesis: snap.synthesis?.body || null,
         internal: { groupName: group ? str(group.name) : null, groupId: str(s.group_id), authors: [...authors].map(([id, name]) => ({ id, name })) },
       },
@@ -144,7 +144,7 @@ export function publicView(p: Row) {
     kind: c.type,
     stageTitle: c.stageTitle,
     revision: c.revision ?? null,
-    entries: c.entries.map((e) => ({ questionText: e.questionText, kind: e.kind, body: e.body, tags: e.tags, table: e.table, attachmentId: e.attachment?.id ?? null })),
+    entries: c.entries.map((e) => ({ questionText: e.questionText, choice: e.choice ?? null, kind: e.kind, body: e.body, tags: e.tags, table: e.table, attachmentId: e.attachment?.id ?? null })),
     synthesis: c.synthesis,
     ai: c.ai ?? null,
     publishedAt: num(p.updated_at),

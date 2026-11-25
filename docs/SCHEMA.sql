@@ -103,7 +103,7 @@ CREATE TABLE entries(
   deleted_at INTEGER,
   hidden_at INTEGER,
   hidden_by TEXT
-);
+, choice TEXT);
 
 CREATE TABLE entry_versions(
   entry_id TEXT NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
@@ -114,7 +114,7 @@ CREATE TABLE entry_versions(
   tags_json TEXT NOT NULL,
   table_json TEXT,
   attachment_id TEXT,
-  saved_at INTEGER NOT NULL,
+  saved_at INTEGER NOT NULL, choice TEXT,
   PRIMARY KEY(entry_id, version)
 );
 
@@ -301,7 +301,7 @@ CREATE TABLE stage_questions(
   position INTEGER NOT NULL,
   text TEXT NOT NULL,
   required INTEGER NOT NULL DEFAULT 0
-, deleted_at INTEGER, visible INTEGER NOT NULL DEFAULT 1, parent_id TEXT, heading TEXT NOT NULL DEFAULT '');
+, deleted_at INTEGER, visible INTEGER NOT NULL DEFAULT 1, parent_id TEXT, heading TEXT NOT NULL DEFAULT '', options_json TEXT NOT NULL DEFAULT '[]');
 
 CREATE TABLE stage_resources(
   id TEXT PRIMARY KEY,
@@ -374,6 +374,8 @@ CREATE INDEX idx_comments_target ON peer_comments(target_type, target_id);
 CREATE UNIQUE INDEX idx_entries_clientkey ON entries(author_id, client_key) WHERE client_key IS NOT NULL;
 
 CREATE INDEX idx_entries_gs ON entries(group_id, stage_id);
+
+CREATE INDEX idx_entries_question_choice ON entries(question_id, choice);
 
 CREATE INDEX idx_groups_session ON groups(session_id);
 
