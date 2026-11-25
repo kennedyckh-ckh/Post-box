@@ -3,7 +3,7 @@ import { newId } from "../crypto";
 import { route, badRequest, conflict, forbidden, notFound, HttpError } from "../router";
 import { requireStaff, requireParticipant, facilitatorSession, groupForFacilitator, mustBeEditable } from "../authz";
 import { stageAccess } from "../stages";
-import { submissionState, buildSnapshot, missingRequired, expectedGroups, type SubState } from "../submissions";
+import { submissionState, buildSnapshot, missingRequired, expectedGroups, individualProgress, type SubState } from "../submissions";
 import { obj, text, bool } from "../validate";
 import { parseJson } from "../content";
 
@@ -57,6 +57,7 @@ route("POST", "/stages/:sid/submit", (ctx) => {
   const pc = requireParticipant(ctx);
   const a = stageAccess(pc, ctx.params.sid);
   const b = obj(ctx.req.body);
+  if (a.stage.submit_mode === "individual") throw badRequest("In this part each person submits each answer on its own, so there is no group submission.", "individual_part");
   if (b.confirm !== true) throw badRequest("Please confirm that you want to submit. Submitting locks this part for your group.", "confirmation_required");
   const key = b.requestKey === undefined ? null : text(b.requestKey, "requestKey", { max: 64 });
   const gid = str(pc.group!.id);
@@ -104,9 +105,10 @@ route("GET", "/sessions/:id/overview", (ctx) => {
       const excluded = !!num(get("SELECT excluded FROM group_stage_settings WHERE group_id=? AND stage_id=?", str(g.id), str(st.id))?.excluded);
       const entryCount = num(get("SELECT COUNT(*) AS c FROM entries WHERE group_id=? AND stage_id=? AND deleted_at IS NULL", str(g.id), str(st.id))!.c);
       if (state.status === "submitted" && expectedIds.has(str(g.id))) submitted++;
-      cells.push({ groupId: g.id, stageId: st.id, ...subView(state), entryCount, excluded, empty: num(g.n) === 0, expected: expectedIds.has(str(g.id)) });
+      const answers = num(get("SELECT COUNT(*) AS c FROM entries WHERE group_id=? AND stage_id=? AND deleted_at IS NULL AND submitted_at IS NOT NULL", str(g.id), str(st.id))!.c);
+      cells.push({ groupId: g.id, stageId: st.id, ...subView(state), entryCount, submittedAnswers: answers, excluded, empty: num(g.n) === 0, expected: expectedIds.has(str(g.id)) });
     }
-    return { id: st.id, title: st.title, position: num(st.position), enabled: !!num(st.enabled), availability: st.availability, expected: expected.length, submitted, missing: expected.filter((g) => submissionState(str(g.id), str(st.id)).status !== "submitted").map((g) => ({ id: g.id, name: g.name })) };
+    return { id: st.id, title: st.title, position: num(st.position), enabled: !!num(st.enabled), availability: st.availability, submitMode: str(st.submit_mode ?? "group"), individual: individualProgress(str(st.id)), expected: expected.length, submitted, missing: expected.filter((g) => submissionState(str(g.id), str(st.id)).status !== "submitted").map((g) => ({ id: g.id, name: g.name })) };
   });
   return { groups: groups.map((g) => ({ id: g.id, name: g.name, members: num(g.n) })), stages: perStage, cells };
 });

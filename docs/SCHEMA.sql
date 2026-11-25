@@ -103,7 +103,7 @@ CREATE TABLE entries(
   deleted_at INTEGER,
   hidden_at INTEGER,
   hidden_by TEXT
-, choice TEXT);
+, choice TEXT, submitted_at INTEGER);
 
 CREATE TABLE entry_versions(
   entry_id TEXT NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
@@ -323,7 +323,7 @@ CREATE TABLE stages(
   availability TEXT NOT NULL DEFAULT 'locked' CHECK(availability IN ('locked','open','closed')),
   instructions TEXT NOT NULL DEFAULT '',
   contribution_types_json TEXT NOT NULL DEFAULT '["text","table","image"]',
-  tags_json TEXT NOT NULL DEFAULT '[]', reference_stage_ids_json TEXT NOT NULL DEFAULT '[]',
+  tags_json TEXT NOT NULL DEFAULT '[]', reference_stage_ids_json TEXT NOT NULL DEFAULT '[]', submit_mode TEXT NOT NULL DEFAULT 'group' CHECK(submit_mode IN ('group','individual')),
   UNIQUE(session_id, position)
 );
 

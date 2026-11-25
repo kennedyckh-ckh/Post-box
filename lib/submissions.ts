@@ -113,3 +113,9 @@ export function expectedGroups(sessionId: string, stageId: string): Row[] {
     stageId
   );
 }
+
+/** Parts where each person submits their own answers: how many answers are submitted or still drafts, and by how many people. */
+export function individualProgress(stageId: string): { submittedAnswers: number; draftAnswers: number; people: number } {
+  const r = get("SELECT SUM(CASE WHEN submitted_at IS NOT NULL THEN 1 ELSE 0 END) AS s, SUM(CASE WHEN submitted_at IS NULL THEN 1 ELSE 0 END) AS d, COUNT(DISTINCT CASE WHEN submitted_at IS NOT NULL THEN author_id END) AS p FROM entries WHERE stage_id=? AND deleted_at IS NULL AND hidden_at IS NULL", stageId);
+  return { submittedAnswers: num(r?.s ?? 0), draftAnswers: num(r?.d ?? 0), people: num(r?.p ?? 0) };
+}

@@ -5,7 +5,7 @@ import { ParticipantTimer } from "@/components/timer";
 import { api, errText, ApiError } from "@/lib/client/api";
 import { Shell, Card, Button, Alert, Badge, inputCls, LogoffButton } from "@/components/ui";
 import { EntryEditor } from "@/components/participant/entry-editor";
-import { EntryBody, ChoiceBadge, timeText } from "@/components/participant/entry-view";
+import { EntryBody, ChoiceBadge, SubmittedBadge, timeText } from "@/components/participant/entry-view";
 import { SubmitPanel } from "@/components/participant/submit-panel";
 import { ReactionBar, CommentList, CommentBox } from "@/components/participant/engagement";
 import type { Entry, EntryList, SaveState, StageDetail } from "@/components/participant/types";
@@ -86,13 +86,19 @@ export default function StagePage({ params }: { params: Promise<{ id: string }> 
     if (mine) { setPresetQ(null); setEditing(mine); } else { setPresetQ(qid); setEditing("new"); }
     setTimeout(() => document.getElementById("entry-editor")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   };
+  const individual = st.submitMode === "individual";
+  const submitOne = async (e: Entry) => {
+    try { await api("POST", `/entries/${e.id}/submit`, {}); setSave({ s: "saved", msg: "Submitted." }); void poll(true); } catch (er) { setError(errText(er)); }
+  };
   const AnswerControl = ({ q, label }: { q: { id: string; options?: string[] }; label: string }) => {
     if (!q.options?.length) return null;
     const mine = myAnswer(q.id);
+    const done = individual && !!mine?.submittedAt;
     return (
       <span className="mt-1.5 flex flex-wrap items-center gap-2">
-        {mine ? <><span className="text-sm text-muted">Your answer:</span><ChoiceBadge choice={mine.choice!} /></> : <span className="text-sm text-muted">{q.options.join(" / ")}</span>}
-        {canWrite && editing === null && <Button variant={mine ? "secondary" : "primary"} aria-label={`${mine ? "Change your answer to" : "Answer"} ${label}`} onClick={() => answer(q.id)}>{mine ? "Change my answer" : "Answer"}</Button>}
+        {mine ? <><span className="text-sm text-muted">Your answer:</span><ChoiceBadge choice={mine.choice!} />{individual && <SubmittedBadge at={mine.submittedAt} />}</> : <span className="text-sm text-muted">{q.options.join(" / ")}</span>}
+        {canWrite && editing === null && !done && <Button variant={mine ? "secondary" : "primary"} aria-label={`${mine ? "Change your answer to" : "Answer"} ${label}`} onClick={() => answer(q.id)}>{mine ? (individual ? "Edit draft" : "Change my answer") : "Answer"}</Button>}
+        {canWrite && editing === null && individual && mine && !mine.submittedAt && <Button aria-label={`Submit your answer to ${label}`} onClick={() => void submitOne(mine)}>Submit</Button>}
       </span>
     );
   };
@@ -173,8 +179,9 @@ export default function StagePage({ params }: { params: Promise<{ id: string }> 
                   <li key={e.id}>
                     <Card as="div" className={e.mine ? "border-brand" : ""}>
                       <div className="mb-1 flex flex-wrap items-center justify-between gap-2 text-sm">
-                        <span><strong>{e.authorName}</strong>{e.mine && " (you)"} · {timeText(e.updatedAt)}{e.version > 1 && " · edited"}</span>
-                        {e.mine && canWrite && editing === null && (
+                        <span className="flex flex-wrap items-center gap-2"><span><strong>{e.authorName}</strong>{e.mine && " (you)"} · {timeText(e.updatedAt)}{e.version > 1 && " · edited"}</span>{individual && <SubmittedBadge at={e.submittedAt} />}</span>
+                        {e.mine && canWrite && editing === null && individual && !e.submittedAt && <Button aria-label={`Submit your entry from ${timeText(e.createdAt)}`} onClick={() => void submitOne(e)}>Submit</Button>}
+                        {e.mine && canWrite && editing === null && !(individual && e.submittedAt) && (
                           <span className="flex gap-2">
                             <Button variant="secondary" aria-label={`Edit your entry from ${timeText(e.createdAt)}`} onClick={() => { setEditing(e); setSave({ s: "idle" }); }}>Edit</Button>
                             <Button variant="danger" aria-label={`Delete your entry from ${timeText(e.createdAt)}`} onClick={async () => { if (confirm("Delete this entry?")) { try { await api("DELETE", `/entries/${e.id}`); void poll(true); } catch (er) { setError(errText(er)); } } }}>Delete</Button>
@@ -194,7 +201,12 @@ export default function StagePage({ params }: { params: Promise<{ id: string }> 
 
           <GroupResponse stageId={st.id} synth={list.synthesis} canWrite={canWrite} onSaved={() => void poll(true)} />
 
-          <SubmitPanel stageId={st.id} groupName="your group" sub={list.submission} canWrite={canWrite || list.submission.status === "reopened"} busyEditing={editing !== null || save.s === "saving" || save.s === "unsaved"} onSubmitted={() => void poll(true)} />
+          {individual ? (
+            <Card label="How to submit">
+              <h2 className="mb-1 text-xl font-semibold">Submit each answer on its own</h2>
+              <p className="text-sm text-slate-700">In this part there is no group submission. Submit each of your answers when it is ready; your other answers and your teammates' answers are not affected. {(() => { const mine = list.entries.filter((e) => e.mine); const done = mine.filter((e) => e.submittedAt).length; return mine.length ? <strong>You have submitted {done} of your {mine.length} {mine.length === 1 ? "answer" : "answers"}.</strong> : null; })()}</p>
+            </Card>
+          ) : <SubmitPanel stageId={st.id} groupName="your group" sub={list.submission} canWrite={canWrite || list.submission.status === "reopened"} busyEditing={editing !== null || save.s === "saving" || save.s === "unsaved"} onSubmitted={() => void poll(true)} />}
         </div>
 
         <aside aria-label="Reference from earlier parts">

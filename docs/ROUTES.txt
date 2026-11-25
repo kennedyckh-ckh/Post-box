@@ -27,6 +27,8 @@ POST   /api/comments/:id/moderate
 DELETE /api/entries/:id
 PATCH  /api/entries/:id
 POST   /api/entries/:id/hide
+POST   /api/entries/:id/return
+POST   /api/entries/:id/submit
 DELETE /api/groups/:gid
 PATCH  /api/groups/:gid
 POST   /api/groups/:gid/representative

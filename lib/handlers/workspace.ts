@@ -21,7 +21,7 @@ function entryForParticipant(e: Row, viewerId: string) {
   return {
     id: e.id, authorName: e.author_name, mine: e.author_id === viewerId, questionId: e.question_id ?? null, choice: e.choice ?? null, kind: e.kind, body: e.body,
     tags: parseJson<string[]>(e.tags_json, []), table: e.table_json ? parseJson(e.table_json, null) : null, attachment: attachmentView(e.attachment_id),
-    version: num(e.version), createdAt: num(e.created_at), updatedAt: num(e.updated_at),
+    version: num(e.version), createdAt: num(e.created_at), updatedAt: num(e.updated_at), submittedAt: e.submitted_at ? num(e.submitted_at) : null,
   };
 }
 
@@ -37,7 +37,7 @@ function synthesisOf(groupId: string, stageId: string) {
 
 /** Cheap change detector for polling: the client sends the last tag it saw and gets back only "unchanged" if nothing moved. */
 function etagFor(rows: Row[], syn: { version: number }, state: string): string {
-  return sha256(rows.map((r) => `${r.id}:${r.version}`).join("|") + `#${syn.version}#${state}`).slice(0, 16);
+  return sha256(rows.map((r) => `${r.id}:${r.version}:${r.submitted_at ?? ""}`).join("|") + `#${syn.version}#${state}`).slice(0, 16);
 }
 
 function stageDetail(pc: ParticipantCtx, stageId: string) {
@@ -62,6 +62,7 @@ function stageDetail(pc: ParticipantCtx, stageId: string) {
   return {
     stage: {
       id: st.id, title: st.title, instructions: st.instructions, tags: parseJson<string[]>(st.tags_json, []), contributionTypes: parseJson<string[]>(st.contribution_types_json, []),
+      submitMode: str(st.submit_mode ?? "group"),
       availability: a.availability, canWrite: a.canWrite, blockedReason: a.blocked,
     },
     // Only questions the facilitator has revealed. Hidden ones are not sent at all.
@@ -94,7 +95,7 @@ route("GET", "/stages/:sid/entries", (ctx) => {
   const ids = rows.map((r) => str(r.id));
   // Revealing or hiding a question changes the tag, so open pages pick up newly revealed questions within seconds.
   const qStamp = sha256(JSON.stringify(shownQuestions(ctx.params.sid).map((q) => [q.id, q.heading, q.text, q.required, q.options]))).slice(0, 16);
-  const tag = etagFor(rows, syn, `${a.availability}:${a.canWrite}:${sub.status}:${sub.revision}:${engagementStamp("entry", ids)}:${rcfg.enabled}:${ccfg.enabled}:${qStamp}`);
+  const tag = etagFor(rows, syn, `${str(a.stage.submit_mode)}:${a.availability}:${a.canWrite}:${sub.status}:${sub.revision}:${engagementStamp("entry", ids)}:${rcfg.enabled}:${ccfg.enabled}:${qStamp}`);
   if (ctx.req.query.etag === tag) return { unchanged: true, etag: tag };
   const me = str(pc.participant.id);
   const groupOn = (sc: string) => sc === "group" || sc === "both";
@@ -181,18 +182,42 @@ route("POST", "/stages/:sid/entries", (ctx) => {
     run("INSERT INTO entries(id,session_id,group_id,stage_id,question_id,choice,author_id,author_name,kind,body,tags_json,table_json,attachment_id,version,client_key,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?)",
       id, str(pc.session.id), str(pc.group!.id), ctx.params.sid, c.questionId, c.choice, pid, str(pc.participant.display_name), c.kind, c.body, JSON.stringify(c.tags), c.table, c.attachmentId, key, now(), now());
     saveVersion(id, 1, c);
+    if (wantsSubmit(b, a.stage)) markSubmitted(pc, id);
     return { entry: entryForParticipant(get("SELECT * FROM entries WHERE id=?", id)!, pid), duplicate: false };
   });
   return out;
 });
 
 /** The participant's own entry in their own group. Anything else answers 404. */
-function ownEntry(pc: ParticipantCtx, id: string): Row {
+function ownEntry(pc: ParticipantCtx, id: string, opts: { allowSubmitted?: boolean } = {}): Row {
   const e = get("SELECT * FROM entries WHERE id=? AND deleted_at IS NULL", id);
   if (!e || e.author_id !== pc.participant.id || !pc.group || e.group_id !== pc.group.id) throw notFound("Entry not found");
   if (e.hidden_at) throw forbidden("Your facilitator has hidden this entry, so it cannot be changed.", "entry_hidden");
+  if (e.submitted_at && opts.allowSubmitted !== true) throw forbidden("You have submitted this answer, so it cannot be changed. Ask your facilitator to return it if you need to change it.", "answer_submitted");
   return e;
 }
+
+/** Individual parts only: "submit" on save, or the separate submit button, hands in this one answer. */
+function wantsSubmit(b: Record<string, unknown>, stage: Row): boolean {
+  if (b.submit !== true) return false;
+  if (stage.submit_mode !== "individual") throw badRequest("In this part your group submits its work together.", "group_part");
+  return true;
+}
+function markSubmitted(pc: ParticipantCtx, entryId: string) {
+  run("UPDATE entries SET submitted_at=? WHERE id=? AND submitted_at IS NULL", now(), entryId);
+  audit("participant", str(pc.participant.id), "answer_submitted", { sessionId: str(pc.session.id), target: entryId });
+}
+
+/** Submit one of your own saved answers (individual parts). Repeating it is harmless. */
+route("POST", "/entries/:id/submit", (ctx) => {
+  const pc = requireParticipant(ctx);
+  const e = ownEntry(pc, ctx.params.id, { allowSubmitted: true });
+  const a = stageAccess(pc, str(e.stage_id));
+  assertWritable(a);
+  if (a.stage.submit_mode !== "individual") throw badRequest("In this part your group submits its work together.", "group_part");
+  if (!e.submitted_at) markSubmitted(pc, str(e.id));
+  return { entry: entryForParticipant(get("SELECT * FROM entries WHERE id=?", str(e.id))!, str(pc.participant.id)) };
+});
 
 route("PATCH", "/entries/:id", (ctx) => {
   const pc = requireParticipant(ctx);
@@ -213,6 +238,7 @@ route("PATCH", "/entries/:id", (ctx) => {
     const v = base + 1;
     run("UPDATE entries SET question_id=?, choice=?, kind=?, body=?, tags_json=?, table_json=?, attachment_id=?, version=?, updated_at=? WHERE id=?", c.questionId, c.choice, c.kind, c.body, JSON.stringify(c.tags), c.table, c.attachmentId, v, now(), str(cur.id));
     saveVersion(str(cur.id), v, c);
+    if (wantsSubmit(b, a.stage)) markSubmitted(pc, str(cur.id));
     return { entry: entryForParticipant(get("SELECT * FROM entries WHERE id=?", str(cur.id))!, me) };
   });
 });

@@ -7,12 +7,12 @@ import type { Detail, Act } from "./types";
 
 interface StageFull {
   id: string; position: number; title: string; enabled: boolean; visible: boolean; availability: "locked" | "open" | "closed"; instructions: string;
-  tags: string[]; contributionTypes: string[]; referenceStageIds: string[]; entryCount: number;
+  tags: string[]; contributionTypes: string[]; referenceStageIds: string[]; entryCount: number; submitMode: "group" | "individual";
   questions: { id: string; heading: string; text: string; required: boolean; visible: boolean; parentId: string | null; options: string[] }[];
   tallies: Tally[];
   resources: { id: string; kind: "link" | "file"; title: string; url: string | null; mime: string | null }[];
 }
-interface Tally { questionId: string; options: { label: string; count: number }[]; other: number; total: number; byGroup: { groupId: string; counts: Record<string, number>; total: number }[] }
+interface Tally { questionId: string; options: { label: string; count: number }[]; other: number; total: number; pending: number; byGroup: { groupId: string; counts: Record<string, number>; total: number }[] }
 
 const PRESETS: { label: string; options: string[] }[] = [
   { label: "Agree / Disagree", options: ["Agree", "Disagree"] },
@@ -60,6 +60,7 @@ function TallyBars({ t, groups }: { t: Tally; groups: { id: string; name: string
             <span className="w-24 shrink-0 text-right tabular-nums"><strong>{o.count}</strong>{t.total ? ` (${Math.round((o.count / t.total) * 100)}%)` : ""}</span>
           </li>
         ))}
+        {t.pending > 0 && <li className="text-muted">{t.pending} more {t.pending === 1 ? "answer is" : "answers are"} saved as {t.pending === 1 ? "a draft" : "drafts"} and will count once submitted.</li>}
         {t.other > 0 && <li className="text-muted">{t.other} earlier {t.other === 1 ? "answer uses an option" : "answers use options"} you have since renamed or removed.</li>}
       </ul>
       {t.byGroup.length > 0 && (
@@ -85,6 +86,7 @@ function StageCard({ st, all, d, gs, act, reload }: { st: StageFull; all: StageF
   const [tags, setTags] = useState(st.tags.join(", "));
   const [types, setTypes] = useState(st.contributionTypes);
   const [refs, setRefs] = useState(st.referenceStageIds);
+  const [mode, setMode] = useState(st.submitMode);
   const [q, setQ] = useState("");
   const [qReq, setQReq] = useState(false);
   const [qHidden, setQHidden] = useState(true);
@@ -95,6 +97,17 @@ function StageCard({ st, all, d, gs, act, reload }: { st: StageFull; all: StageF
   const archived = d.session.status === "archived";
   const earlier = all.filter((o) => o.position < st.position);
   const mains = st.questions.filter((x) => !x.parentId);
+  // "Add another statement": copies the format of the last main question when it uses response options.
+  const lastMain = mains[mains.length - 1];
+  const lastChoice = lastMain && lastMain.options.length > 0 ? lastMain : null;
+  const nextHeading = (() => {
+    const h = lastChoice?.heading ?? "";
+    const m = h.match(/^(.*?)(\d+)\s*$/);
+    return m ? `${m[1]}${Number(m[2]) + 1}` : h;
+  })();
+  const [nsHeading, setNsHeading] = useState(nextHeading);
+  const [nsText, setNsText] = useState("");
+  const [nsHidden, setNsHidden] = useState(lastChoice ? !lastChoice.visible : false);
   const visibleCount = mains.filter((x) => x.visible).length;
   const hiddenCount = mains.length - visibleCount;
   const [subFor, setSubFor] = useState<string | null>(null);
@@ -162,13 +175,18 @@ function StageCard({ st, all, d, gs, act, reload }: { st: StageFull; all: StageF
           <legend className="mb-1 text-sm font-semibold">What participants can add</legend>
           <div className="flex flex-wrap gap-4">{["text", "table", "image"].map((t) => <label key={t} className="flex min-h-11 items-center gap-2"><input type="checkbox" className="h-5 w-5" checked={types.includes(t)} onChange={(e) => setTypes(e.target.checked ? [...types, t] : types.filter((x) => x !== t))} /> {t === "text" ? "Text" : t === "table" ? "Data tables" : "Pictures"}</label>)}</div>
         </fieldset>
+        <fieldset className="mb-4">
+          <legend className="mb-1 text-sm font-semibold">How this part is submitted</legend>
+          <label className="flex min-h-11 items-start gap-2 pt-2 text-sm"><input type="radio" className="mt-0.5" name={`sm-${st.id}`} checked={mode === "individual"} onChange={() => setMode("individual")} /> <span><strong>Each person submits each answer on its own</strong> (for example one statement at a time). There is no group submission; a submitted answer is locked for its author until you return it.</span></label>
+          <label className="flex min-h-11 items-start gap-2 pt-2 text-sm"><input type="radio" className="mt-0.5" name={`sm-${st.id}`} checked={mode === "group"} onChange={() => setMode("group")} /> <span><strong>The group submits the whole part together</strong>, which locks the part for that group.</span></label>
+        </fieldset>
         {earlier.length > 0 && (
           <fieldset className="mb-4">
             <legend className="mb-1 text-sm font-semibold">Reference panel: show each group's own work from</legend>
             <div className="flex flex-wrap gap-4">{earlier.map((e) => <label key={e.id} className="flex min-h-11 items-center gap-2"><input type="checkbox" className="h-5 w-5" checked={refs.includes(e.id)} onChange={(ev) => setRefs(ev.target.checked ? [...refs, e.id] : refs.filter((x) => x !== e.id))} /> {e.title}</label>)}</div>
           </fieldset>
         )}
-        <Button disabled={archived || !title.trim() || !(types.includes("text") || types.includes("table"))} onClick={() => void run(() => api("PATCH", `/stages/${st.id}`, { title, instructions: instr, tags: tags.split(",").map((t) => t.trim()).filter(Boolean), contributionTypes: types, referenceStageIds: refs }), "Part saved.")}>Save this part</Button>
+        <Button disabled={archived || !title.trim() || !(types.includes("text") || types.includes("table"))} onClick={() => void run(() => api("PATCH", `/stages/${st.id}`, { title, instructions: instr, tags: tags.split(",").map((t) => t.trim()).filter(Boolean), contributionTypes: types, referenceStageIds: refs, submitMode: mode }), "Part saved.")}>Save this part</Button>
 
         <div className="mt-8 rounded-xl border border-line bg-surface-2 p-4 sm:p-5">
           <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
@@ -234,6 +252,22 @@ function StageCard({ st, all, d, gs, act, reload }: { st: StageFull; all: StageF
               );
             })}
           </ol>
+          {lastChoice && (
+            <form className="mb-5 rounded-xl border-2 border-dashed border-brand/50 bg-brand-soft/40 p-4" onSubmit={(e) => { e.preventDefault(); if (!nsText.trim()) return; void run(async () => { await api("POST", `/stages/${st.id}/questions`, { text: nsText, heading: nsHeading, options: lastChoice.options, required: lastChoice.required, visible: !nsHidden }); setNsText(""); }, nsHidden ? "Statement added (hidden until you reveal it)." : "Statement added and shown to participants."); }} aria-label={`Add another statement to ${st.title}`}>
+              <h4 className="text-base font-semibold text-ink">Add another statement</h4>
+              <p className="mb-3 text-sm text-muted">Same format as question {mains.length}: <strong className="text-ink">{lastChoice.options.join(" / ")}</strong>, then a reason{lastChoice.required ? ", required" : ""}. Add as many as you need.</p>
+              <div className="grid gap-x-4 sm:grid-cols-[minmax(10rem,14rem)_1fr]">
+                <TextField label="Heading" value={nsHeading} onChange={setNsHeading} maxLength={120} />
+                <TextField label={`Statement ${mains.length + 1}`} value={nsText} onChange={setNsText} maxLength={500} />
+              </div>
+              <div className="flex flex-wrap items-center gap-4">
+                <Button type="submit" disabled={archived || !nsText.trim()}>Add statement</Button>
+                <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" className="h-5 w-5" checked={nsHidden} onChange={(e) => setNsHidden(e.target.checked)} /> Keep hidden until I reveal it</label>
+              </div>
+            </form>
+          )}
+          <details className="group" open={!lastChoice}>
+          <summary className={lastChoice ? "mb-3 cursor-pointer text-sm font-semibold text-brand-strong" : "sr-only"}>Add a different kind of question</summary>
           <div className="flex flex-wrap items-end gap-x-4 gap-y-1">
             <div className="basis-full"><TextField label="Heading for the new question (optional)" value={qHeading} onChange={setQHeading} maxLength={120} /></div>
             <div className="min-w-64 flex-1"><TextField label="New main question" value={q} onChange={setQ} maxLength={500} /></div>
@@ -242,6 +276,7 @@ function StageCard({ st, all, d, gs, act, reload }: { st: StageFull; all: StageF
             <label className="mb-4 flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" className="h-5 w-5" checked={qReq} onChange={(e) => setQReq(e.target.checked)} /> Required</label>
             <div className="mb-4"><Button disabled={archived || !q.trim()} onClick={() => void run(async () => { await api("POST", `/stages/${st.id}/questions`, { text: q, heading: qHeading, required: qReq, visible: !qHidden, options: parseOpts(qOpts) }); setQ(""); setQHeading(""); setQReq(false); setQOpts(""); }, qHidden ? "Question added (hidden until you reveal it)." : "Question added and shown to participants.")}>Add question</Button></div>
           </div>
+          </details>
           <p className="text-sm text-muted">Sub-questions are optional and appear together with their main question. Required questions only count once they are shown. You can also reveal questions from the projector view.</p>
         </div>
 

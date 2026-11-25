@@ -31,7 +31,7 @@ route("GET", "/sessions/:id/stages", (ctx) => {
   const stages = all("SELECT * FROM stages WHERE session_id=? ORDER BY position", str(s.id)).map((st) => ({
     id: st.id, position: num(st.position), title: st.title, enabled: !!num(st.enabled), visible: !!num(st.visible), availability: st.availability,
     instructions: st.instructions, tags: parseJson<string[]>(st.tags_json, []), contributionTypes: parseJson<string[]>(st.contribution_types_json, []),
-    referenceStageIds: parseJson<string[]>(st.reference_stage_ids_json, []),
+    referenceStageIds: parseJson<string[]>(st.reference_stage_ids_json, []), submitMode: str(st.submit_mode ?? "group"),
     questions: questionsOf(str(st.id)), resources: resourcesOf(str(st.id)), tallies: stageTallies(str(st.id)),
     entryCount: num(get("SELECT COUNT(*) AS c FROM entries WHERE stage_id=? AND deleted_at IS NULL", str(st.id))!.c),
   }));
@@ -73,6 +73,8 @@ route("PATCH", "/stages/:sid", (ctx) => {
     }
     sets.push("reference_stage_ids_json=?"); vals.push(JSON.stringify([...new Set(b.referenceStageIds.map(String))]));
   }
+  // "group": the group submits the whole part together. "individual": each person submits each answer on its own.
+  if (b.submitMode !== undefined) { const m = oneOf(b.submitMode, "How this part is submitted", ["group", "individual"] as const); sets.push("submit_mode=?"); vals.push(m); changes.submitMode = m; }
   if (b.visible !== undefined) { const v = bool(b.visible, "visible"); sets.push("visible=?"); vals.push(v ? 1 : 0); changes.visible = v; }
   if (b.enabled !== undefined) {
     const en = bool(b.enabled, "enabled");
@@ -91,8 +93,9 @@ route("PATCH", "/stages/:sid", (ctx) => {
       if (to === "locked" && num(get("SELECT COUNT(*) AS c FROM entries WHERE stage_id=?", str(stage.id))!.c) > 0) throw conflict("This part already has contributions, so it cannot be locked again. Close it instead.", "has_entries");
       // Releasing a later part while expected groups have not submitted the previous one needs a deliberate, recorded reason.
       if (to === "open" && from === "locked") {
-        const prev = get("SELECT id,title FROM stages WHERE session_id=? AND enabled=1 AND position<? ORDER BY position DESC LIMIT 1", str(session.id), num(stage.position));
-        if (prev) {
+        const prev = get("SELECT id,title,submit_mode FROM stages WHERE session_id=? AND enabled=1 AND position<? ORDER BY position DESC LIMIT 1", str(session.id), num(stage.position));
+        // A part where each person submits their own answers has no group submission to wait for.
+        if (prev && prev.submit_mode !== "individual") {
           const missing = expectedGroups(str(session.id), str(prev.id)).filter((g) => submissionState(str(g.id), str(prev.id)).status !== "submitted").map((g) => ({ id: str(g.id), name: str(g.name) }));
           if (missing.length) {
             const reason = typeof b.proceedReason === "string" ? text(b.proceedReason, "Reason", { max: 300, optional: true }) : "";
@@ -305,6 +308,7 @@ export function entryRow(e: Row) {
     id: e.id, groupId: e.group_id, stageId: e.stage_id, questionId: e.question_id ?? null, choice: e.choice ?? null, authorId: e.author_id, authorName: e.author_name,
     kind: e.kind, body: e.body, tags: parseJson<string[]>(e.tags_json, []), table: e.table_json ? parseJson(e.table_json, null) : null,
     attachmentId: e.attachment_id ?? null, version: num(e.version), createdAt: num(e.created_at), updatedAt: num(e.updated_at), hidden: !!e.hidden_at,
+    submittedAt: e.submitted_at ? num(e.submitted_at) : null,
   };
 }
 
@@ -337,6 +341,19 @@ route("POST", "/entries/:id/hide", (ctx) => {
   const hidden = bool(obj(ctx.req.body).hidden, "hidden");
   run("UPDATE entries SET hidden_at=?, hidden_by=? WHERE id=?", hidden ? now() : null, hidden ? u.id : null, str(e.id));
   audit("facilitator", u.id, hidden ? "entry_hidden" : "entry_unhidden", { sessionId: str(session.id), target: str(e.id) });
+  return { ok: true };
+});
+
+/** In a part where each person submits their own answers: give one submitted answer back so its author can change it. */
+route("POST", "/entries/:id/return", (ctx) => {
+  const u = requireStaff(ctx);
+  const e = get("SELECT * FROM entries WHERE id=? AND deleted_at IS NULL", ctx.params.id);
+  if (!e) throw notFound("Entry not found");
+  const session = facilitatorSession(ctx, str(e.session_id));
+  mustBeEditable(session);
+  if (!e.submitted_at) throw conflict("This answer has not been submitted.", "not_submitted");
+  run("UPDATE entries SET submitted_at=NULL WHERE id=?", str(e.id));
+  audit("facilitator", u.id, "answer_returned", { sessionId: str(session.id), target: str(e.id) });
   return { ok: true };
 });
 

@@ -56,8 +56,8 @@ export function groupsView(sessionId: string) {
 }
 
 function stagesView(sessionId: string) {
-  return all("SELECT id,position,title,enabled,visible,availability FROM stages WHERE session_id=? ORDER BY position", sessionId).map((s) => ({
-    id: s.id, position: num(s.position), title: s.title, enabled: !!num(s.enabled), visible: !!num(s.visible), availability: s.availability,
+  return all("SELECT id,position,title,enabled,visible,availability,submit_mode FROM stages WHERE session_id=? ORDER BY position", sessionId).map((s) => ({
+    id: s.id, position: num(s.position), title: s.title, enabled: !!num(s.enabled), visible: !!num(s.visible), availability: s.availability, submitMode: s.submit_mode,
   }));
 }
 
@@ -104,6 +104,7 @@ route("POST", "/sessions", (ctx) => {
       // Defaults (brief section 5): every stage starts locked; starting the session opens the first enabled stage.
       run("INSERT INTO stages(id,session_id,position,title,enabled,visible,availability,instructions,tags_json) VALUES(?,?,?,?,?,1,'locked',?,?)", stageId, id, i + 1, st.title, enabled[i] === true ? 1 : 0, st.instructions, JSON.stringify(st.tags));
       if (st.contributionTypes) run("UPDATE stages SET contribution_types_json=? WHERE id=?", JSON.stringify(st.contributionTypes), stageId);
+      if (st.submitMode) run("UPDATE stages SET submit_mode=? WHERE id=?", st.submitMode, stageId);
       st.questions.forEach((q, qi) => run("INSERT INTO stage_questions(id,stage_id,position,text,required,heading,options_json) VALUES(?,?,?,?,?,?,?)", newId("que"), stageId, qi + 1, q.text, q.required ? 1 : 0, q.heading ?? "", JSON.stringify(q.options ?? [])));
     });
     for (let i = 0; i < groupCount; i++) {

@@ -36,7 +36,7 @@ function build(s: Row, identified: boolean) {
       entryId: e.id, stageId: e.stage_id, stageTitle: stageTitle.get(str(e.stage_id)), group: g(e.group_id), questionId: e.question_id ?? null, questionText: e.question_id ? qText.get(str(e.question_id)) ?? null : null, choice: e.choice ?? null,
       author: p(e.author_id), authorName: identified ? str(e.author_name) : undefined, kind: e.kind, body: e.body, tags: parseJson<string[]>(e.tags_json, []),
       table: e.table_json ? parseJson(e.table_json, null) : null, attachment: e.attachment_id ? { id: e.attachment_id, note: "file not embedded; download separately" } : null,
-      version: num(e.version), createdAt: num(e.created_at), updatedAt: num(e.updated_at), hiddenByFacilitator: !!e.hidden_at,
+      version: num(e.version), createdAt: num(e.created_at), updatedAt: num(e.updated_at), submittedAt: e.submitted_at ? num(e.submitted_at) : null, hiddenByFacilitator: !!e.hidden_at,
       reactionCounts: entryReacts[str(e.id)].counts,
     })),
     groupResponses: all("SELECT gs.*, st.title FROM group_synthesis gs JOIN groups gr ON gr.id=gs.group_id JOIN stages st ON st.id=gs.stage_id WHERE gr.session_id=? ORDER BY gs.updated_at", sid).map((r) => ({ group: g(r.group_id), stageId: r.stage_id, stageTitle: r.title, body: r.body, version: num(r.version), updatedAt: num(r.updated_at) })),
